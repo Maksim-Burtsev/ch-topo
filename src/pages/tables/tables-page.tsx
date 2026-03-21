@@ -1,29 +1,38 @@
-import { Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
-import { useState, useMemo } from 'react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, Search } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Badge } from '@/components/ui/badge'
 import { getEngineVariant } from '@/components/ui/engine-variant'
 import { Input } from '@/components/ui/input'
-import { mockTables } from '@/lib/mock/data'
+import type { RawTableRow } from '@/lib/clickhouse/types'
 import { formatBytes, formatNumber } from '@/lib/utils'
-import type { TableInfo } from '@/types'
+import { useSchemaStore } from '@/stores/schema-store'
 
-type SortField = 'name' | 'engine' | 'total_rows' | 'total_bytes' | 'compression' | 'active_parts'
+type SortField = 'name' | 'engine' | 'total_rows' | 'total_bytes' | 'compression'
 type SortDir = 'asc' | 'desc'
 
-function getCompression(t: TableInfo): number {
-  if (t.total_bytes === 0) return 0
-  return t.compressed_bytes / t.total_bytes
+function numVal(s: string): number {
+  return Number(s) || 0
+}
+
+function getCompression(t: RawTableRow): number {
+  const total = numVal(t.total_bytes)
+  if (total === 0) return 0
+  return numVal(t.data_compressed_bytes) / total
 }
 
 export function TablesPage() {
   const navigate = useNavigate()
+  const tables = useSchemaStore((s) => s.tables)
+  const tablesReady = useSchemaStore((s) => s.tablesReady)
+  const status = useSchemaStore((s) => s.status)
+
   const [filter, setFilter] = useState('')
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
 
   const filtered = useMemo(() => {
-    const result = mockTables.filter((t) => t.name.toLowerCase().includes(filter.toLowerCase()))
+    const result = tables.filter((t) => t.name.toLowerCase().includes(filter.toLowerCase()))
 
     result.sort((a, b) => {
       let cmp = 0
@@ -35,23 +44,20 @@ export function TablesPage() {
           cmp = a.engine.localeCompare(b.engine)
           break
         case 'total_rows':
-          cmp = a.total_rows - b.total_rows
+          cmp = numVal(a.total_rows) - numVal(b.total_rows)
           break
         case 'total_bytes':
-          cmp = a.total_bytes - b.total_bytes
+          cmp = numVal(a.total_bytes) - numVal(b.total_bytes)
           break
         case 'compression':
           cmp = getCompression(a) - getCompression(b)
-          break
-        case 'active_parts':
-          cmp = a.active_parts - b.active_parts
           break
       }
       return sortDir === 'asc' ? cmp : -cmp
     })
 
     return result
-  }, [filter, sortField, sortDir])
+  }, [tables, filter, sortField, sortDir])
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -65,6 +71,14 @@ export function TablesPage() {
   function SortIcon({ field }: { field: SortField }) {
     if (sortField !== field) return <ArrowUpDown size={12} className="text-muted-foreground/50" />
     return sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+  }
+
+  if (!tablesReady && status === 'loading') {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 size={24} className="animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
   return (
@@ -100,7 +114,6 @@ export function TablesPage() {
                   ['total_rows', 'Rows'],
                   ['total_bytes', 'Size'],
                   ['compression', 'Compression'],
-                  ['active_parts', 'Parts'],
                 ] as [SortField, string][]
               ).map(([field, label]) => (
                 <th
@@ -121,22 +134,26 @@ export function TablesPage() {
           <tbody>
             {filtered.map((t) => (
               <tr
-                key={t.name}
+                key={`${t.database}.${t.name}`}
                 className="border-b border-border last:border-0 hover:bg-muted/30 cursor-pointer transition-colors"
                 onClick={() => {
-                  void navigate(`/tables/${t.name}`)
+                  void navigate(`/tables/${t.database}/${t.name}`)
                 }}
               >
-                <td className="px-4 py-3 font-medium">{t.name}</td>
+                <td className="px-4 py-3">
+                  <span className="font-medium">{t.name}</span>
+                  <span className="ml-2 text-xs text-muted-foreground">{t.database}</span>
+                </td>
                 <td className="px-4 py-3">
                   <Badge variant={getEngineVariant(t.engine)}>{t.engine}</Badge>
                 </td>
-                <td className="px-4 py-3 tabular-nums">{formatNumber(t.total_rows)}</td>
-                <td className="px-4 py-3 tabular-nums">{formatBytes(t.total_bytes)}</td>
+                <td className="px-4 py-3 tabular-nums">{formatNumber(numVal(t.total_rows))}</td>
+                <td className="px-4 py-3 tabular-nums">{formatBytes(numVal(t.total_bytes))}</td>
                 <td className="px-4 py-3 tabular-nums">
-                  {t.total_bytes > 0 ? `${(getCompression(t) * 100).toFixed(1)}%` : '—'}
+                  {numVal(t.total_bytes) > 0
+                    ? `${(getCompression(t) * 100).toFixed(1)}%`
+                    : '\u2014'}
                 </td>
-                <td className="px-4 py-3 tabular-nums">{t.active_parts}</td>
               </tr>
             ))}
           </tbody>

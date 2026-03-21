@@ -1,32 +1,55 @@
 import { Zap } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { SeverityCard } from '@/components/shared/severity-card'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
-import { mockImpactResults, mockDropTableImpacts, mockDropEventDateImpacts } from '@/lib/mock/data'
+import { mockDropEventDateImpacts, mockDropTableImpacts, mockImpactResults } from '@/lib/mock/data'
+import { useSchemaStore } from '@/stores/schema-store'
 import type { Impact } from '@/types'
 
-const actions = [
-  { value: 'drop_user_id', label: 'DROP COLUMN user_id' },
-  { value: 'drop_event_date', label: 'DROP COLUMN event_date' },
-  { value: 'drop_table_events', label: 'DROP TABLE events' },
-] as const
-
-type ActionValue = (typeof actions)[number]['value']
-
-const impactMap: Record<ActionValue, Impact[]> = {
-  drop_user_id: mockImpactResults,
-  drop_event_date: mockDropEventDateImpacts,
-  drop_table_events: mockDropTableImpacts,
-}
+type ActionType = 'drop_column' | 'drop_table'
 
 export function ImpactPage() {
-  const [table, setTable] = useState('events')
-  const [action, setAction] = useState<ActionValue>('drop_user_id')
+  const tables = useSchemaStore((s) => s.tables)
+  const columns = useSchemaStore((s) => s.columns)
+
+  const [selectedTable, setSelectedTable] = useState('')
+  const [actionType, setActionType] = useState<ActionType>('drop_column')
+  const [selectedColumn, setSelectedColumn] = useState('')
   const [results, setResults] = useState<Impact[] | null>(null)
 
+  const tableOptions = useMemo(
+    () =>
+      tables.map((t) => ({ value: `${t.database}.${t.name}`, label: `${t.database}.${t.name}` })),
+    [tables],
+  )
+
+  const columnOptions = useMemo(() => {
+    if (!selectedTable) return []
+    const [db, tbl] = selectedTable.split('.')
+    return columns
+      .filter((c) => c.database === db && c.table === tbl)
+      .map((c) => ({ value: c.name, label: c.name }))
+  }, [columns, selectedTable])
+
   function analyze() {
-    setResults(impactMap[action])
+    // TODO: real impact analysis from graph store (iteration 6)
+    // For now, match mock data for known scenarios
+    if (selectedTable === 'analytics.events') {
+      if (actionType === 'drop_table') {
+        setResults(mockDropTableImpacts)
+        return
+      }
+      if (selectedColumn === 'user_id') {
+        setResults(mockImpactResults)
+        return
+      }
+      if (selectedColumn === 'event_date') {
+        setResults(mockDropEventDateImpacts)
+        return
+      }
+    }
+    setResults([])
   }
 
   const breaks = results?.filter((r) => r.severity === 'break') ?? []
@@ -43,39 +66,74 @@ export function ImpactPage() {
         <div className="flex-1">
           <label className="mb-1.5 block text-xs text-muted-foreground">Table</label>
           <Select
-            value={table}
+            value={selectedTable}
             onChange={(e) => {
-              setTable(e.target.value)
+              setSelectedTable(e.target.value)
+              setSelectedColumn('')
+              setResults(null)
             }}
           >
-            <option value="events">analytics.events</option>
-            <option value="sessions">analytics.sessions</option>
-            <option value="users">analytics.users</option>
-            <option value="raw_events">analytics.raw_events</option>
-          </Select>
-        </div>
-        <div className="flex-1">
-          <label className="mb-1.5 block text-xs text-muted-foreground">Action</label>
-          <Select
-            value={action}
-            onChange={(e) => {
-              setAction(e.target.value as ActionValue)
-            }}
-          >
-            {actions.map((a) => (
-              <option key={a.value} value={a.value}>
-                {a.label}
+            <option value="">Select table...</option>
+            {tableOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
               </option>
             ))}
           </Select>
         </div>
-        <Button onClick={analyze} className="gap-2">
+
+        <div className="flex-1">
+          <label className="mb-1.5 block text-xs text-muted-foreground">Action</label>
+          <Select
+            value={actionType}
+            onChange={(e) => {
+              setActionType(e.target.value as ActionType)
+              setResults(null)
+            }}
+          >
+            <option value="drop_column">DROP COLUMN</option>
+            <option value="drop_table">DROP TABLE</option>
+          </Select>
+        </div>
+
+        {actionType === 'drop_column' && (
+          <div className="flex-1">
+            <label className="mb-1.5 block text-xs text-muted-foreground">Column</label>
+            <Select
+              value={selectedColumn}
+              onChange={(e) => {
+                setSelectedColumn(e.target.value)
+                setResults(null)
+              }}
+              disabled={!selectedTable}
+            >
+              <option value="">Select column...</option>
+              {columnOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
+
+        <Button
+          onClick={analyze}
+          className="gap-2"
+          disabled={!selectedTable || (actionType === 'drop_column' && !selectedColumn)}
+        >
           <Zap size={14} />
           Analyze
         </Button>
       </div>
 
-      {results && (
+      {results && results.length === 0 && (
+        <div className="rounded-lg border border-border bg-card p-6 text-center text-sm text-muted-foreground">
+          No impacts detected for this action.
+        </div>
+      )}
+
+      {results && results.length > 0 && (
         <div className="space-y-6">
           {/* Summary */}
           <div className="flex items-center gap-4 rounded-lg border border-border bg-card p-4">

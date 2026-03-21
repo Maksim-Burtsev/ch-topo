@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { ConnectionParams } from '@/lib/clickhouse/types'
 import { useConnectionStore } from '@/stores/connection-store'
+import { useSchemaStore } from '@/stores/schema-store'
 
 const STORAGE_KEY = 'chtopo_connection'
 
@@ -37,7 +38,10 @@ export function ConnectPage() {
 
     if (saved) {
       void connect(saved).then((ok) => {
-        if (ok) void navigate('/')
+        if (ok) {
+          void useSchemaStore.getState().loadSchema(saved)
+          void navigate('/')
+        }
       })
     }
   }, [connect, navigate])
@@ -52,7 +56,10 @@ export function ConnectPage() {
       password,
     }
     void connect(params).then((ok) => {
-      if (ok) void navigate('/')
+      if (ok) {
+        void useSchemaStore.getState().loadSchema(params)
+        void navigate('/')
+      }
     })
   }
 

@@ -12,10 +12,20 @@ export interface RawTableRow {
   engine: string
   total_rows: string
   total_bytes: string
+  data_compressed_bytes: string
   create_table_query: string
   sorting_key: string
   partition_key: string
   metadata_modification_time: string
+}
+
+export interface RawDDLHistoryRow {
+  event_time: string
+  query: string
+  type: string
+  exception: string
+  query_duration_ms: string
+  user: string
 }
 
 export interface RawColumnRow {

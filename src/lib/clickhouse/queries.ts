@@ -1,12 +1,13 @@
 import { query } from './client'
 import type {
   ConnectionParams,
-  RawTableRow,
   RawColumnRow,
-  RawIndexRow,
+  RawDDLHistoryRow,
   RawDictionaryRow,
-  RawRowPolicyRow,
   RawGrantRow,
+  RawIndexRow,
+  RawRowPolicyRow,
+  RawTableRow,
 } from './types'
 
 const EXCLUDED_DBS = `('system', 'INFORMATION_SCHEMA', 'information_schema')`
@@ -15,6 +16,7 @@ export function fetchTables(params: ConnectionParams) {
   return query<RawTableRow>(
     params,
     `SELECT database, name, engine, total_rows, total_bytes,
+       data_compressed_bytes,
        create_table_query, sorting_key, partition_key,
        metadata_modification_time
 FROM system.tables
@@ -63,5 +65,17 @@ export function fetchGrants(params: ConnectionParams) {
     `SELECT user_name, role_name, database, table, column, grant_option
 FROM system.grants
 WHERE column != ''`,
+  )
+}
+
+export function fetchDDLHistory(params: ConnectionParams) {
+  return query<RawDDLHistoryRow>(
+    params,
+    `SELECT event_time, query, type, exception, query_duration_ms, user
+FROM system.query_log
+WHERE query_kind IN ('Create', 'Alter', 'Drop', 'Rename')
+  AND type IN ('QueryFinish', 'ExceptionWhileProcessing')
+ORDER BY event_time DESC
+LIMIT 50`,
   )
 }

@@ -17,6 +17,7 @@ const rawTables: RawTableRow[] = mockTables.map((t) => ({
   engine: t.engine,
   total_rows: String(t.total_rows),
   total_bytes: String(t.total_bytes),
+  data_compressed_bytes: String(t.compressed_bytes),
   create_table_query: t.create_table_query,
   sorting_key: t.sorting_key,
   partition_key: t.partition_key,
@@ -325,6 +326,7 @@ describe('distributed and buffer tables', () => {
         engine: 'Distributed',
         total_rows: '0',
         total_bytes: '0',
+        data_compressed_bytes: '0',
         create_table_query:
           "CREATE TABLE analytics.events_distributed ENGINE = Distributed('cluster1', 'analytics', 'events', rand())",
         sorting_key: '',
@@ -353,6 +355,7 @@ describe('distributed and buffer tables', () => {
         engine: 'Buffer',
         total_rows: '0',
         total_bytes: '0',
+        data_compressed_bytes: '0',
         create_table_query:
           "CREATE TABLE analytics.events_buffer ENGINE = Buffer('analytics', 'events', 16, 10, 100, 10000, 100000, 10000000, 100000000)",
         sorting_key: '',

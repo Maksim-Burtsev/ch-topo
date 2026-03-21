@@ -18,7 +18,7 @@ export const router = createHashRouter([
     children: [
       { path: '/', element: <GraphPage /> },
       { path: '/tables', element: <TablesPage /> },
-      { path: '/tables/:name', element: <TableDetailPage /> },
+      { path: '/tables/:database/:name', element: <TableDetailPage /> },
       { path: '/impact', element: <ImpactPage /> },
       { path: '/history', element: <HistoryPage /> },
       { path: '/migrations', element: <MigrationsPage /> },

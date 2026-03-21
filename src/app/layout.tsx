@@ -1,7 +1,11 @@
-import { FolderSync, History, LogOut, Table2, Workflow, Zap } from 'lucide-react'
+import { FolderSync, History, Loader2, LogOut, Table2, Workflow, Zap } from 'lucide-react'
+import { useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { cn } from '@/lib/utils'
 import { useConnectionStore } from '@/stores/connection-store'
+import { useGraphStore } from '@/stores/graph-store'
+import { useHistoryStore } from '@/stores/history-store'
+import { useSchemaStore } from '@/stores/schema-store'
 
 const navItems = [
   { path: '/', icon: Workflow, label: 'Graph' },
@@ -25,14 +29,40 @@ export function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
   const title = getPageTitle(location.pathname)
-  const { host, port, isConnected, error, disconnect } = useConnectionStore()
+  const { host, port, isConnected, disconnect } = useConnectionStore()
+  const schemaStatus = useSchemaStore((s) => s.status)
 
-  const hasError = !!error
-  const displayHost = isConnected ? `${host}:${port}` : 'Not connected'
+  // Auth guard: redirect to /connect if not connected
+  useEffect(() => {
+    if (!isConnected) {
+      void navigate('/connect')
+    }
+  }, [isConnected, navigate])
+
+  // Trigger schema loading when connected but schema not yet loaded
+  useEffect(() => {
+    if (isConnected && schemaStatus === 'idle') {
+      const params = useConnectionStore.getState().getParams()
+      void useSchemaStore.getState().loadSchema(params)
+    }
+  }, [isConnected, schemaStatus])
+
+  const displayHost = `${host}:${port}`
 
   function handleDisconnect() {
     disconnect()
+    useSchemaStore.getState().reset()
+    useGraphStore.getState().reset()
+    useHistoryStore.getState().reset()
     void navigate('/connect')
+  }
+
+  if (!isConnected) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Loader2 size={24} className="animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
   return (
@@ -82,22 +112,16 @@ export function Layout() {
         <header className="flex h-12 items-center justify-between border-b border-border bg-card px-4">
           <h1 className="text-sm font-medium">{title}</h1>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {isConnected ? (
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-              </span>
-            ) : (
-              <span className="relative flex h-2 w-2">
-                <span
-                  className={cn(
-                    'relative inline-flex h-2 w-2 rounded-full',
-                    hasError ? 'bg-red-500' : 'bg-zinc-500',
-                  )}
-                />
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+            </span>
+            {displayHost}
+            {schemaStatus === 'loading' && (
+              <span className="ml-1 text-muted-foreground/60">
+                <Loader2 size={12} className="animate-spin" />
               </span>
             )}
-            {displayHost}
           </div>
         </header>
 
