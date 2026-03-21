@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 import { Badge } from '@/components/ui/badge'
 import { getEngineVariant } from '@/components/ui/engine-variant'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import type { RawTableRow } from '@/lib/clickhouse/types'
 import { formatBytes, formatNumber } from '@/lib/utils'
 import { useSchemaStore } from '@/stores/schema-store'
@@ -28,11 +29,21 @@ export function TablesPage() {
   const status = useSchemaStore((s) => s.status)
 
   const [filter, setFilter] = useState('')
+  const [engineFilter, setEngineFilter] = useState('')
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
 
+  const engines = useMemo(() => {
+    const set = new Set(tables.map((t) => t.engine))
+    return [...set].sort()
+  }, [tables])
+
   const filtered = useMemo(() => {
-    const result = tables.filter((t) => t.name.toLowerCase().includes(filter.toLowerCase()))
+    const result = tables.filter(
+      (t) =>
+        t.name.toLowerCase().includes(filter.toLowerCase()) &&
+        (engineFilter === '' || t.engine === engineFilter),
+    )
 
     result.sort((a, b) => {
       let cmp = 0
@@ -57,7 +68,7 @@ export function TablesPage() {
     })
 
     return result
-  }, [tables, filter, sortField, sortDir])
+  }, [tables, filter, engineFilter, sortField, sortDir])
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -98,6 +109,20 @@ export function TablesPage() {
             className="pl-9"
           />
         </div>
+        <Select
+          value={engineFilter}
+          onChange={(e) => {
+            setEngineFilter(e.target.value)
+          }}
+          className="w-44"
+        >
+          <option value="">All engines</option>
+          {engines.map((e) => (
+            <option key={e} value={e}>
+              {e}
+            </option>
+          ))}
+        </Select>
         <span className="text-xs text-muted-foreground">
           {filtered.length} table{filtered.length !== 1 ? 's' : ''}
         </span>
