@@ -1,4 +1,14 @@
-import { FolderSync, History, Loader2, LogOut, Table2, Workflow, Zap } from 'lucide-react'
+import {
+  FolderSync,
+  History,
+  Loader2,
+  LogOut,
+  Moon,
+  Sun,
+  Table2,
+  Workflow,
+  Zap,
+} from 'lucide-react'
 import { useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { cn } from '@/lib/utils'
@@ -6,6 +16,7 @@ import { useConnectionStore } from '@/stores/connection-store'
 import { useGraphStore } from '@/stores/graph-store'
 import { useHistoryStore } from '@/stores/history-store'
 import { useSchemaStore } from '@/stores/schema-store'
+import { useThemeStore } from '@/stores/theme-store'
 
 const navItems = [
   { path: '/', icon: Workflow, label: 'Graph' },
@@ -57,6 +68,8 @@ export function Layout() {
     void navigate('/connect')
   }
 
+  const { theme, toggle: toggleTheme } = useThemeStore()
+
   if (!isConnected) {
     return null
   }
@@ -91,7 +104,14 @@ export function Layout() {
           )
         })}
 
-        <div className="mt-auto">
+        <div className="mt-auto flex flex-col items-center gap-1">
+          <button
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
           <button
             onClick={handleDisconnect}
             title="Disconnect"

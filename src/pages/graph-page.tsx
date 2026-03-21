@@ -18,6 +18,7 @@ import type { DependencyGraph } from '@/lib/graph/types'
 import { formatNumber } from '@/lib/utils'
 import { useGraphStore } from '@/stores/graph-store'
 import { useSchemaStore } from '@/stores/schema-store'
+import { useThemeStore } from '@/stores/theme-store'
 
 const nodeTypes = { schema: SchemaNode }
 
@@ -174,6 +175,7 @@ export function GraphPage() {
   const dictionaries = useSchemaStore((s) => s.dictionaries)
   const tablesReady = useSchemaStore((s) => s.tablesReady)
   const graph = useGraphStore((s) => s.graph)
+  const theme = useThemeStore((s) => s.theme)
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
@@ -250,9 +252,15 @@ export function GraphPage() {
           fitView
           minZoom={0.3}
           maxZoom={2}
+          colorMode={theme}
           proOptions={{ hideAttribution: true }}
         >
-          <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#27272a" />
+          <Background
+            variant={BackgroundVariant.Dots}
+            gap={20}
+            size={1}
+            color={theme === 'dark' ? '#27272a' : '#cbd5e1'}
+          />
           <Controls />
           <MiniMap
             nodeColor={(node) => {
