@@ -1,0 +1,75 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-background: #09090b;
+  --color-foreground: #fafafa;
+  --color-card: #0a0a0c;
+  --color-card-foreground: #fafafa;
+  --color-popover: #0a0a0c;
+  --color-popover-foreground: #fafafa;
+  --color-primary: #3b82f6;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #1e1e22;
+  --color-secondary-foreground: #fafafa;
+  --color-muted: #18181b;
+  --color-muted-foreground: #a1a1aa;
+  --color-accent: #1e1e22;
+  --color-accent-foreground: #fafafa;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #fafafa;
+  --color-border: #27272a;
+  --color-input: #27272a;
+  --color-ring: #3b82f6;
+  --radius: 0.5rem;
+
+  --color-engine-mergetree: #22c55e;
+  --color-engine-summing: #f59e0b;
+  --color-engine-aggregating: #f59e0b;
+  --color-engine-replacing: #06b6d4;
+  --color-engine-mv: #a855f7;
+  --color-engine-distributed: #f87171;
+  --color-engine-dictionary: #fbbf24;
+
+  --color-severity-break: #ef4444;
+  --color-severity-stale: #f59e0b;
+  --color-severity-warning: #a855f7;
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+/* React Flow overrides */
+.react-flow__minimap {
+  background-color: var(--color-card) !important;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border) !important;
+}
+
+.react-flow__controls {
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border) !important;
+  background-color: var(--color-card) !important;
+}
+
+.react-flow__controls button {
+  background-color: var(--color-card) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-foreground) !important;
+  fill: var(--color-foreground) !important;
+}
+
+.react-flow__controls button:hover {
+  background-color: var(--color-secondary) !important;
+}
