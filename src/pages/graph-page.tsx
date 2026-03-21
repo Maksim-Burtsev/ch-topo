@@ -10,6 +10,7 @@ import {
 } from '@xyflow/react'
 import type { Edge, Node, NodeMouseHandler } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
+import { Info, Map } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { SchemaNode } from '@/components/graph/schema-node'
 import { TableDetailPanel } from '@/components/graph/table-detail-panel'
@@ -209,6 +210,8 @@ export function GraphPage() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [databaseFilter, setDatabaseFilter] = useState('')
+  const [showMinimap, setShowMinimap] = useState(true)
+  const [showLegend, setShowLegend] = useState(true)
 
   const databases = useMemo(() => {
     const set = new Set(tables.map((t) => t.database))
@@ -407,17 +410,36 @@ export function GraphPage() {
             color={theme === 'dark' ? '#27272a' : '#cbd5e1'}
           />
           <Controls />
-          <MiniMap
-            nodeColor={(node) => {
-              const nt = (node.data as { nodeType: string }).nodeType
-              if (nt === 'mv') return '#a855f7'
-              if (nt === 'target') return '#f87171'
-              if (nt === 'dictionary') return '#fbbf24'
-              return '#22c55e'
-            }}
-            maskColor="rgba(0,0,0,0.6)"
-          />
+          {showMinimap && (
+            <MiniMap
+              nodeColor={(node) => {
+                const nt = (node.data as { nodeType: string }).nodeType
+                if (nt === 'mv') return '#a855f7'
+                if (nt === 'target') return '#f87171'
+                if (nt === 'dictionary') return '#fbbf24'
+                return '#22c55e'
+              }}
+              maskColor="rgba(0,0,0,0.6)"
+              pannable
+              zoomable
+            />
+          )}
         </ReactFlow>
+
+        {/* Minimap toggle */}
+        <button
+          onClick={() => {
+            setShowMinimap((v) => !v)
+          }}
+          title={showMinimap ? 'Hide minimap' : 'Show minimap'}
+          className={`absolute bottom-4 right-4 z-10 rounded-md border border-border p-1.5 transition-colors ${
+            showMinimap
+              ? 'bg-card text-foreground'
+              : 'bg-card text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Map size={14} />
+        </button>
 
         {/* Tooltip */}
         {tooltip && (
@@ -456,32 +478,53 @@ export function GraphPage() {
         )}
 
         {/* Legend */}
-        <div className="absolute bottom-4 left-14 flex items-center gap-4 rounded-lg border border-border bg-card/90 backdrop-blur px-4 py-2.5 text-xs">
-          <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-            Source Table
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-purple-500" />
-            Materialized View
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-red-400" />
-            Target Table
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
-            Dictionary
-          </span>
-          <span className="flex items-center gap-1.5 ml-2 border-l border-border pl-4">
-            <span className="w-6 border-t-2 border-dashed border-purple-500" />
-            MV reads
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-6 border-t-2 border-red-400" />
-            MV writes
-          </span>
-        </div>
+        {showLegend ? (
+          <div className="absolute bottom-4 left-14 flex items-center gap-4 rounded-lg border border-border bg-card/90 backdrop-blur px-4 py-2.5 text-xs">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+              Source Table
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-purple-500" />
+              Materialized View
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-red-400" />
+              Target Table
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
+              Dictionary
+            </span>
+            <span className="flex items-center gap-1.5 ml-2 border-l border-border pl-4">
+              <span className="w-6 border-t-2 border-dashed border-purple-500" />
+              MV reads
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-6 border-t-2 border-red-400" />
+              MV writes
+            </span>
+            <button
+              onClick={() => {
+                setShowLegend(false)
+              }}
+              className="ml-1 text-muted-foreground hover:text-foreground transition-colors"
+              title="Hide legend"
+            >
+              &times;
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => {
+              setShowLegend(true)
+            }}
+            title="Show legend"
+            className="absolute bottom-4 left-14 z-10 rounded-md border border-border bg-card p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Info size={14} />
+          </button>
+        )}
       </div>
 
       {/* Detail Panel */}
