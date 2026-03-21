@@ -102,6 +102,12 @@ export function buildDependencyGraph(
     colSet.add(col.name)
   }
 
+  // Step 1b: Build column type lookup
+  for (const col of columns) {
+    const colKey = `${fqn(col.database, col.table)}.${col.name}`
+    graph.columnTypes.set(colKey, col.type)
+  }
+
   // Step 2: Parse each table DDL and populate graph
   for (const table of tables) {
     const tableKey = fqn(table.database, table.name)

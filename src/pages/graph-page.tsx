@@ -226,7 +226,7 @@ export function GraphPage() {
       </ReactFlow>
 
       {/* Legend */}
-      <div className="absolute bottom-4 left-4 flex items-center gap-4 rounded-lg border border-border bg-card/90 backdrop-blur px-4 py-2.5 text-xs">
+      <div className="absolute bottom-4 left-14 flex items-center gap-4 rounded-lg border border-border bg-card/90 backdrop-blur px-4 py-2.5 text-xs">
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
           Source Table

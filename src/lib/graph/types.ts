@@ -35,6 +35,9 @@ export interface DependencyGraph {
   rowPolicies: Map<string, PolicyDependency>
   distributedTables: Map<string, string>
   bufferTables: Map<string, string>
+
+  // Column metadata (for type compatibility checks)
+  columnTypes: Map<string, string> // "db.table.col" → type string
 }
 
 export function emptyDependencyGraph(): DependencyGraph {
@@ -55,5 +58,6 @@ export function emptyDependencyGraph(): DependencyGraph {
     rowPolicies: new Map(),
     distributedTables: new Map(),
     bufferTables: new Map(),
+    columnTypes: new Map(),
   }
 }

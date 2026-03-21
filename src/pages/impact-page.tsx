@@ -1,22 +1,34 @@
-import { Zap } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { CheckCircle, Zap } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { SeverityCard } from '@/components/shared/severity-card'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
-import { mockDropEventDateImpacts, mockDropTableImpacts, mockImpactResults } from '@/lib/mock/data'
+import { analyzeImpact } from '@/lib/graph/impact'
+import { parseAction } from '@/lib/parser/action-parser'
+import { useGraphStore } from '@/stores/graph-store'
 import { useSchemaStore } from '@/stores/schema-store'
-import type { Impact } from '@/types'
+import type { DDLAction, Impact } from '@/types'
 
-type ActionType = 'drop_column' | 'drop_table'
+type InputMode = 'sql' | 'builder'
+type ActionType = 'drop_column' | 'modify_column' | 'rename_column' | 'drop_table'
 
 export function ImpactPage() {
   const tables = useSchemaStore((s) => s.tables)
   const columns = useSchemaStore((s) => s.columns)
+  const graph = useGraphStore((s) => s.graph)
 
+  const [mode, setMode] = useState<InputMode>('sql')
+  const [sqlInput, setSqlInput] = useState('')
+  const [results, setResults] = useState<Impact[] | null>(null)
+
+  // Builder state
   const [selectedTable, setSelectedTable] = useState('')
   const [actionType, setActionType] = useState<ActionType>('drop_column')
   const [selectedColumn, setSelectedColumn] = useState('')
-  const [results, setResults] = useState<Impact[] | null>(null)
+  const [newType, setNewType] = useState('')
+  const [newName, setNewName] = useState('')
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null)
 
   const tableOptions = useMemo(
     () =>
@@ -29,28 +41,91 @@ export function ImpactPage() {
     const [db, tbl] = selectedTable.split('.')
     return columns
       .filter((c) => c.database === db && c.table === tbl)
-      .map((c) => ({ value: c.name, label: c.name }))
+      .map((c) => ({ value: c.name, label: `${c.name} (${c.type})` }))
   }, [columns, selectedTable])
 
-  function analyze() {
-    // TODO: real impact analysis from graph store (iteration 6)
-    // For now, match mock data for known scenarios
-    if (selectedTable === 'analytics.events') {
-      if (actionType === 'drop_table') {
-        setResults(mockDropTableImpacts)
+  // ── SQL Live Analysis ──
+  const runSqlAnalysis = useCallback(
+    (sql: string) => {
+      if (!graph || !sql.trim()) {
+        setResults(null)
         return
       }
-      if (selectedColumn === 'user_id') {
-        setResults(mockImpactResults)
+      const action = parseAction(sql)
+      if (!action) {
+        setResults(null)
         return
       }
-      if (selectedColumn === 'event_date') {
-        setResults(mockDropEventDateImpacts)
-        return
-      }
+      setResults(analyzeImpact(action, graph))
+    },
+    [graph],
+  )
+
+  useEffect(() => {
+    if (mode !== 'sql') return
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      runSqlAnalysis(sqlInput)
+    }, 150)
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-    setResults([])
+  }, [sqlInput, mode, runSqlAnalysis])
+
+  // ── Builder Analysis ──
+  function analyzeFromBuilder() {
+    if (!graph) return
+
+    let action: DDLAction | null = null
+
+    switch (actionType) {
+      case 'drop_column':
+        if (selectedTable && selectedColumn) {
+          action = { type: 'DROP_COLUMN', table: selectedTable, column: selectedColumn }
+        }
+        break
+      case 'modify_column':
+        if (selectedTable && selectedColumn && newType) {
+          action = {
+            type: 'MODIFY_COLUMN',
+            table: selectedTable,
+            column: selectedColumn,
+            newType,
+          }
+        }
+        break
+      case 'rename_column':
+        if (selectedTable && selectedColumn && newName) {
+          action = {
+            type: 'RENAME_COLUMN',
+            table: selectedTable,
+            oldName: selectedColumn,
+            newName,
+          }
+        }
+        break
+      case 'drop_table':
+        if (selectedTable) {
+          action = { type: 'DROP_TABLE', table: selectedTable }
+        }
+        break
+    }
+
+    if (action) {
+      setResults(analyzeImpact(action, graph))
+    }
   }
+
+  const needsColumn = actionType !== 'drop_table'
+  const needsNewType = actionType === 'modify_column'
+  const needsNewName = actionType === 'rename_column'
+
+  const canAnalyze =
+    graph &&
+    selectedTable &&
+    (!needsColumn || selectedColumn) &&
+    (!needsNewType || newType) &&
+    (!needsNewName || newName)
 
   const breaks = results?.filter((r) => r.severity === 'break') ?? []
   const stales = results?.filter((r) => r.severity === 'stale') ?? []
@@ -62,80 +137,174 @@ export function ImpactPage() {
         Simulate a DDL change and see what breaks before you run it.
       </p>
 
-      <div className="mb-6 flex items-end gap-3">
-        <div className="flex-1">
-          <label className="mb-1.5 block text-xs text-muted-foreground">Table</label>
-          <Select
-            value={selectedTable}
-            onChange={(e) => {
-              setSelectedTable(e.target.value)
-              setSelectedColumn('')
-              setResults(null)
-            }}
-          >
-            <option value="">Select table...</option>
-            {tableOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </Select>
-        </div>
-
-        <div className="flex-1">
-          <label className="mb-1.5 block text-xs text-muted-foreground">Action</label>
-          <Select
-            value={actionType}
-            onChange={(e) => {
-              setActionType(e.target.value as ActionType)
-              setResults(null)
-            }}
-          >
-            <option value="drop_column">DROP COLUMN</option>
-            <option value="drop_table">DROP TABLE</option>
-          </Select>
-        </div>
-
-        {actionType === 'drop_column' && (
-          <div className="flex-1">
-            <label className="mb-1.5 block text-xs text-muted-foreground">Column</label>
-            <Select
-              value={selectedColumn}
-              onChange={(e) => {
-                setSelectedColumn(e.target.value)
-                setResults(null)
-              }}
-              disabled={!selectedTable}
-            >
-              <option value="">Select column...</option>
-              {columnOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </Select>
-          </div>
-        )}
-
-        <Button
-          onClick={analyze}
-          className="gap-2"
-          disabled={!selectedTable || (actionType === 'drop_column' && !selectedColumn)}
+      {/* Mode toggle */}
+      <div className="mb-4 flex gap-1 rounded-lg border border-border bg-card p-1 w-fit">
+        <button
+          className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            mode === 'sql'
+              ? 'bg-accent text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+          onClick={() => {
+            setMode('sql')
+            setResults(null)
+          }}
         >
-          <Zap size={14} />
-          Analyze
-        </Button>
+          SQL Input
+        </button>
+        <button
+          className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            mode === 'builder'
+              ? 'bg-accent text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+          onClick={() => {
+            setMode('builder')
+            setResults(null)
+          }}
+        >
+          Builder
+        </button>
       </div>
 
-      {results && results.length === 0 && (
-        <div className="rounded-lg border border-border bg-card p-6 text-center text-sm text-muted-foreground">
-          No impacts detected for this action.
+      {/* SQL Mode */}
+      {mode === 'sql' && (
+        <div className="mb-6">
+          <label className="mb-1.5 block text-xs text-muted-foreground">
+            Enter DDL statement (ALTER TABLE ... DROP/MODIFY/RENAME COLUMN or DROP TABLE)
+          </label>
+          <textarea
+            className="w-full rounded-lg border border-border bg-card px-3 py-2 font-mono text-sm text-foreground placeholder:text-muted-foreground focus:border-accent focus:outline-none resize-none"
+            rows={3}
+            placeholder="ALTER TABLE analytics.events DROP COLUMN user_id"
+            value={sqlInput}
+            onChange={(e) => {
+              setSqlInput(e.target.value)
+            }}
+            spellCheck={false}
+          />
+          {sqlInput.trim() && !parseAction(sqlInput) && (
+            <p className="mt-1 text-xs text-muted-foreground">Waiting for valid DDL...</p>
+          )}
         </div>
       )}
 
-      {results && results.length > 0 && (
+      {/* Builder Mode */}
+      {mode === 'builder' && (
+        <div className="mb-6 space-y-3">
+          <div className="flex items-end gap-3">
+            <div className="flex-1">
+              <label className="mb-1.5 block text-xs text-muted-foreground">Table</label>
+              <Select
+                value={selectedTable}
+                onChange={(e) => {
+                  setSelectedTable(e.target.value)
+                  setSelectedColumn('')
+                  setResults(null)
+                }}
+              >
+                <option value="">Select table...</option>
+                {tableOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <div className="flex-1">
+              <label className="mb-1.5 block text-xs text-muted-foreground">Action</label>
+              <Select
+                value={actionType}
+                onChange={(e) => {
+                  setActionType(e.target.value as ActionType)
+                  setResults(null)
+                }}
+              >
+                <option value="drop_column">DROP COLUMN</option>
+                <option value="modify_column">MODIFY COLUMN</option>
+                <option value="rename_column">RENAME COLUMN</option>
+                <option value="drop_table">DROP TABLE</option>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex items-end gap-3">
+            {needsColumn && (
+              <div className="flex-1">
+                <label className="mb-1.5 block text-xs text-muted-foreground">Column</label>
+                <Select
+                  value={selectedColumn}
+                  onChange={(e) => {
+                    setSelectedColumn(e.target.value)
+                    setResults(null)
+                  }}
+                  disabled={!selectedTable}
+                >
+                  <option value="">Select column...</option>
+                  {columnOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
+
+            {needsNewType && (
+              <div className="flex-1">
+                <label className="mb-1.5 block text-xs text-muted-foreground">New Type</label>
+                <input
+                  className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-accent focus:outline-none"
+                  placeholder="UInt32"
+                  value={newType}
+                  onChange={(e) => {
+                    setNewType(e.target.value)
+                    setResults(null)
+                  }}
+                />
+              </div>
+            )}
+
+            {needsNewName && (
+              <div className="flex-1">
+                <label className="mb-1.5 block text-xs text-muted-foreground">New Name</label>
+                <input
+                  className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-accent focus:outline-none"
+                  placeholder="new_column_name"
+                  value={newName}
+                  onChange={(e) => {
+                    setNewName(e.target.value)
+                    setResults(null)
+                  }}
+                />
+              </div>
+            )}
+
+            <Button onClick={analyzeFromBuilder} className="gap-2" disabled={!canAnalyze}>
+              <Zap size={14} />
+              Analyze
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Results */}
+      {results !== null && results.length === 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-6">
+          <CheckCircle size={20} className="text-emerald-400 shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-emerald-400">Safe to execute</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              No impacts detected for this action.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {results !== null && results.length > 0 && (
         <div className="space-y-6">
-          {/* Summary */}
+          {/* Summary counter */}
           <div className="flex items-center gap-4 rounded-lg border border-border bg-card p-4">
             <div className="flex items-center gap-2">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-500/20 text-xs font-bold text-red-400">

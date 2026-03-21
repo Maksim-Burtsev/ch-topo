@@ -58,11 +58,7 @@ export function Layout() {
   }
 
   if (!isConnected) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <Loader2 size={24} className="animate-spin text-muted-foreground" />
-      </div>
-    )
+    return null
   }
 
   return (

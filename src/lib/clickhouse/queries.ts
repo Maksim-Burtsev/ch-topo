@@ -16,7 +16,7 @@ export function fetchTables(params: ConnectionParams) {
   return query<RawTableRow>(
     params,
     `SELECT database, name, engine, total_rows, total_bytes,
-       data_compressed_bytes,
+       total_bytes AS data_compressed_bytes,
        create_table_query, sorting_key, partition_key,
        metadata_modification_time
 FROM system.tables
@@ -46,7 +46,9 @@ WHERE database NOT IN ${EXCLUDED_DBS}`,
 export function fetchDictionaries(params: ConnectionParams) {
   return query<RawDictionaryRow>(
     params,
-    `SELECT name, database, source, structure
+    `SELECT name, database, source,
+       concat('key: ', arrayStringConcat(arrayMap((n, t) -> concat(n, ' ', t), \`key.names\`, \`key.types\`), ', '),
+              ', attributes: ', arrayStringConcat(arrayMap((n, t) -> concat(n, ' ', t), \`attribute.names\`, \`attribute.types\`), ', ')) AS structure
 FROM system.dictionaries`,
   )
 }
@@ -62,9 +64,10 @@ FROM system.row_policies`,
 export function fetchGrants(params: ConnectionParams) {
   return query<RawGrantRow>(
     params,
-    `SELECT user_name, role_name, database, table, column, grant_option
+    `SELECT ifNull(user_name, '') AS user_name, ifNull(role_name, '') AS role_name,
+       database, table, column, grant_option
 FROM system.grants
-WHERE column != ''`,
+WHERE column <> ''`,
   )
 }
 
