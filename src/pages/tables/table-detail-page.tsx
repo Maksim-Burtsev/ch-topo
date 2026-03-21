@@ -1,4 +1,13 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight, Loader2, Zap } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Check,
+  ChevronRight,
+  ClipboardCopy,
+  Loader2,
+  Zap,
+} from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { MetricCard } from '@/components/shared/metric-card'
@@ -10,6 +19,42 @@ import { useSchemaStore } from '@/stores/schema-store'
 
 type ColSortField = 'name' | 'type' | 'mv'
 type SortDir = 'asc' | 'desc'
+
+/** Lightweight ClickHouse DDL formatter — adds line breaks at major clauses. */
+function formatDDL(sql: string): string {
+  // Normalise whitespace but preserve content inside backticks / parens
+  let s = sql.trim()
+
+  // Break before major top-level keywords (case-insensitive)
+  const keywords = [
+    'ENGINE',
+    'ORDER BY',
+    'PARTITION BY',
+    'PRIMARY KEY',
+    'SAMPLE BY',
+    'TTL',
+    'SETTINGS',
+    'AS SELECT',
+    'FROM',
+    'WHERE',
+    'GROUP BY',
+    'HAVING',
+    'POPULATE',
+  ]
+
+  for (const kw of keywords) {
+    // Only break if it's not already at the start of a line
+    const re = new RegExp(`(?<!^)\\s+(${kw})\\b`, 'gi')
+    s = s.replace(re, '\n$1')
+  }
+
+  // Indent column list: break after opening ( and before closing ) for CREATE TABLE
+  s = s.replace(/\(\s*`/g, '(\n  `')
+  s = s.replace(/,\s*`/g, ',\n  `')
+  s = s.replace(/\n\s*\)\s*ENGINE/g, '\n)\nENGINE')
+
+  return s
+}
 
 export function TableDetailPage() {
   const { database, name } = useParams<{ database: string; name: string }>()
@@ -241,10 +286,37 @@ export function TableDetailPage() {
       </div>
 
       {/* DDL */}
-      <div>
-        <h2 className="mb-3 text-sm font-medium">DDL</h2>
-        <pre className="rounded-lg border border-border bg-muted/30 p-4 text-xs leading-relaxed overflow-x-auto font-mono text-muted-foreground">
-          {table.create_table_query}
+      <DDLBlock sql={table.create_table_query} />
+    </div>
+  )
+}
+
+function DDLBlock({ sql }: { sql: string }) {
+  const [copied, setCopied] = useState(false)
+  const formatted = useMemo(() => formatDDL(sql), [sql])
+
+  const handleCopy = useCallback(() => {
+    void navigator.clipboard.writeText(sql).then(() => {
+      setCopied(true)
+      setTimeout(() => {
+        setCopied(false)
+      }, 2000)
+    })
+  }, [sql])
+
+  return (
+    <div>
+      <h2 className="mb-3 text-sm font-medium">DDL</h2>
+      <div className="group relative rounded-lg border border-border bg-muted/30">
+        <button
+          onClick={handleCopy}
+          className="absolute right-2 top-2 rounded-md border border-border bg-card p-1.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+          title="Copy DDL"
+        >
+          {copied ? <Check size={14} /> : <ClipboardCopy size={14} />}
+        </button>
+        <pre className="p-4 text-xs leading-relaxed overflow-x-auto font-mono text-muted-foreground whitespace-pre-wrap break-words">
+          {formatted}
         </pre>
       </div>
     </div>
