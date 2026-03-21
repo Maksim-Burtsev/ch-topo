@@ -1,5 +1,6 @@
-import { CheckCircle, Zap } from 'lucide-react'
+import { CheckCircle, ClipboardCopy, Zap } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { SeverityCard } from '@/components/shared/severity-card'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
@@ -12,14 +13,39 @@ import type { DDLAction, Impact } from '@/types'
 type InputMode = 'sql' | 'builder'
 type ActionType = 'drop_column' | 'modify_column' | 'rename_column' | 'drop_table'
 
+function impactsToMarkdown(results: Impact[], sql: string): string {
+  const lines: string[] = ['## Impact Analysis', '', `\`\`\`sql\n${sql}\n\`\`\``, '']
+  if (results.length === 0) {
+    lines.push('**Safe to execute** — no impacts detected.')
+    return lines.join('\n')
+  }
+  const groups = [
+    { label: 'Breaking', items: results.filter((r) => r.severity === 'break') },
+    { label: 'Stale', items: results.filter((r) => r.severity === 'stale') },
+    { label: 'Warning', items: results.filter((r) => r.severity === 'warning') },
+  ]
+  for (const g of groups) {
+    if (g.items.length === 0) continue
+    lines.push(`### ${g.label} (${g.items.length})`, '')
+    for (const i of g.items) {
+      lines.push(`- **${i.objectName}** (${i.objectType}): ${i.reason}`)
+    }
+    lines.push('')
+  }
+  return lines.join('\n')
+}
+
 export function ImpactPage() {
   const tables = useSchemaStore((s) => s.tables)
   const columns = useSchemaStore((s) => s.columns)
   const graph = useGraphStore((s) => s.graph)
+  const [searchParams] = useSearchParams()
 
+  const prefillSql = searchParams.get('sql') ?? ''
   const [mode, setMode] = useState<InputMode>('sql')
-  const [sqlInput, setSqlInput] = useState('')
+  const [sqlInput, setSqlInput] = useState(prefillSql)
   const [results, setResults] = useState<Impact[] | null>(null)
+  const [copied, setCopied] = useState(false)
 
   // Builder state
   const [selectedTable, setSelectedTable] = useState('')
@@ -115,6 +141,17 @@ export function ImpactPage() {
       setResults(analyzeImpact(action, graph))
     }
   }
+
+  const handleCopyMarkdown = useCallback(() => {
+    if (!results) return
+    const md = impactsToMarkdown(results, sqlInput)
+    void navigator.clipboard.writeText(md).then(() => {
+      setCopied(true)
+      setTimeout(() => {
+        setCopied(false)
+      }, 2000)
+    })
+  }, [results, sqlInput])
 
   const needsColumn = actionType !== 'drop_table'
   const needsNewType = actionType === 'modify_column'
@@ -294,7 +331,9 @@ export function ImpactPage() {
         <div className="flex items-center gap-3 rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-6">
           <CheckCircle size={20} className="text-emerald-400 shrink-0" />
           <div>
-            <p className="text-sm font-medium text-emerald-400">Safe to execute</p>
+            <p className="text-sm font-medium text-emerald-400">
+              No dependencies affected. Safe to execute.
+            </p>
             <p className="text-xs text-muted-foreground mt-0.5">
               No impacts detected for this action.
             </p>
@@ -323,6 +362,12 @@ export function ImpactPage() {
                 {warnings.length}
               </span>
               <span className="text-xs text-muted-foreground">Warning</span>
+            </div>
+            <div className="ml-auto">
+              <Button variant="ghost" size="sm" onClick={handleCopyMarkdown} className="gap-1.5">
+                <ClipboardCopy size={14} />
+                {copied ? 'Copied!' : 'Copy as Markdown'}
+              </Button>
             </div>
           </div>
 

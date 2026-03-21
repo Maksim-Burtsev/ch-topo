@@ -1,14 +1,4 @@
-import {
-  FolderSync,
-  History,
-  Loader2,
-  LogOut,
-  Moon,
-  Sun,
-  Table2,
-  Workflow,
-  Zap,
-} from 'lucide-react'
+import { FolderSync, History, LogOut, Moon, Sun, Table2, Workflow, Zap } from 'lucide-react'
 import { useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { cn } from '@/lib/utils'
@@ -19,11 +9,11 @@ import { useSchemaStore } from '@/stores/schema-store'
 import { useThemeStore } from '@/stores/theme-store'
 
 const navItems = [
-  { path: '/', icon: Workflow, label: 'Graph' },
-  { path: '/tables', icon: Table2, label: 'Tables' },
-  { path: '/impact', icon: Zap, label: 'Impact' },
-  { path: '/history', icon: History, label: 'History' },
-  { path: '/migrations', icon: FolderSync, label: 'Migrations' },
+  { path: '/', icon: Workflow, label: 'Graph', key: '1' },
+  { path: '/tables', icon: Table2, label: 'Tables', key: '2' },
+  { path: '/impact', icon: Zap, label: 'Impact', key: '3' },
+  { path: '/history', icon: History, label: 'History', key: '4' },
+  { path: '/migrations', icon: FolderSync, label: 'Migrations', key: '5' },
 ]
 
 function getPageTitle(pathname: string): string {
@@ -58,6 +48,41 @@ export function Layout() {
     }
   }, [isConnected, schemaStatus])
 
+  // Document title
+  useEffect(() => {
+    document.title = `chtopo — ${title}`
+  }, [title])
+
+  // Keyboard shortcuts: 1-5 nav, / focus search, Esc
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement
+      const isInput =
+        target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT'
+
+      if (isInput) return
+
+      // 1-5 for page navigation
+      const navItem = navItems.find((item) => item.key === e.key)
+      if (navItem) {
+        e.preventDefault()
+        void navigate(navItem.path)
+        return
+      }
+
+      // / to focus search input
+      if (e.key === '/') {
+        e.preventDefault()
+        const input = document.querySelector<HTMLInputElement>('input[placeholder*="Filter"]')
+        input?.focus()
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => {
+      window.removeEventListener('keydown', handleKey)
+    }
+  }, [navigate])
+
   const displayHost = `${host}:${port}`
 
   function handleDisconnect() {
@@ -75,7 +100,7 @@ export function Layout() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden min-w-[1024px]">
       {/* Sidebar */}
       <aside className="flex w-[52px] flex-col items-center border-r border-border bg-card py-3 gap-1">
         <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary font-bold text-xs">
@@ -91,7 +116,7 @@ export function Layout() {
               onClick={() => {
                 void navigate(item.path)
               }}
-              title={item.label}
+              title={`${item.label} (${item.key})`}
               className={cn(
                 'flex h-9 w-9 items-center justify-center rounded-md transition-colors',
                 isActive
@@ -128,16 +153,19 @@ export function Layout() {
         <header className="flex h-12 items-center justify-between border-b border-border bg-card px-4">
           <h1 className="text-sm font-medium">{title}</h1>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            {schemaStatus === 'loading' && (
+              <div className="flex items-center gap-2">
+                <div className="h-1 w-24 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full w-1/2 rounded-full bg-primary animate-pulse" />
+                </div>
+                <span className="text-muted-foreground/60">Loading schema...</span>
+              </div>
+            )}
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
             </span>
             {displayHost}
-            {schemaStatus === 'loading' && (
-              <span className="ml-1 text-muted-foreground/60">
-                <Loader2 size={12} className="animate-spin" />
-              </span>
-            )}
           </div>
         </header>
 

@@ -1,5 +1,5 @@
-import { ChevronRight, Loader2 } from 'lucide-react'
-import { useMemo } from 'react'
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight, Loader2, Zap } from 'lucide-react'
+import { useCallback, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { MetricCard } from '@/components/shared/metric-card'
 import { Badge } from '@/components/ui/badge'
@@ -7,6 +7,9 @@ import { getEngineVariant } from '@/components/ui/engine-variant'
 import { formatBytes, formatNumber } from '@/lib/utils'
 import { useGraphStore } from '@/stores/graph-store'
 import { useSchemaStore } from '@/stores/schema-store'
+
+type ColSortField = 'name' | 'type' | 'mv'
+type SortDir = 'asc' | 'desc'
 
 export function TableDetailPage() {
   const { database, name } = useParams<{ database: string; name: string }>()
@@ -16,6 +19,9 @@ export function TableDetailPage() {
   const columns = useSchemaStore((s) => s.columns)
   const columnsReady = useSchemaStore((s) => s.columnsReady)
   const graph = useGraphStore((s) => s.graph)
+
+  const [colSort, setColSort] = useState<ColSortField>('name')
+  const [colDir, setColDir] = useState<SortDir>('asc')
 
   const table = tables.find((t) => t.database === database && t.name === name)
 
@@ -36,6 +42,51 @@ export function TableDetailPage() {
     }
     return counts
   }, [graph, database, name, tableColumns])
+
+  const sortedColumns = useMemo(() => {
+    const sorted = [...tableColumns]
+    sorted.sort((a, b) => {
+      let cmp = 0
+      switch (colSort) {
+        case 'name':
+          cmp = a.name.localeCompare(b.name)
+          break
+        case 'type':
+          cmp = a.type.localeCompare(b.type)
+          break
+        case 'mv':
+          cmp = (mvCounts.get(a.name) ?? 0) - (mvCounts.get(b.name) ?? 0)
+          break
+      }
+      return colDir === 'asc' ? cmp : -cmp
+    })
+    return sorted
+  }, [tableColumns, colSort, colDir, mvCounts])
+
+  const toggleColSort = useCallback(
+    (field: ColSortField) => {
+      if (colSort === field) {
+        setColDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+      } else {
+        setColSort(field)
+        setColDir('asc')
+      }
+    },
+    [colSort],
+  )
+
+  const colSortIcon = (field: ColSortField) => {
+    if (colSort !== field) return <ArrowUpDown size={12} className="text-muted-foreground/50" />
+    return colDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+  }
+
+  const handleDropColumn = useCallback(
+    (colName: string) => {
+      const sql = `ALTER TABLE ${database}.${name} DROP COLUMN ${colName}`
+      void navigate(`/impact?sql=${encodeURIComponent(sql)}`)
+    },
+    [database, name, navigate],
+  )
 
   if (!table) {
     return (
@@ -97,11 +148,27 @@ export function TableDetailPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/50">
-                  <th className="h-9 px-4 text-left text-xs font-medium text-muted-foreground">
-                    Name
+                  <th
+                    className="h-9 px-4 text-left text-xs font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
+                    onClick={() => {
+                      toggleColSort('name')
+                    }}
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      Name
+                      {colSortIcon('name')}
+                    </span>
                   </th>
-                  <th className="h-9 px-4 text-left text-xs font-medium text-muted-foreground">
-                    Type
+                  <th
+                    className="h-9 px-4 text-left text-xs font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
+                    onClick={() => {
+                      toggleColSort('type')
+                    }}
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      Type
+                      {colSortIcon('type')}
+                    </span>
                   </th>
                   <th className="h-9 px-4 text-left text-xs font-medium text-muted-foreground">
                     Codec
@@ -109,13 +176,24 @@ export function TableDetailPage() {
                   <th className="h-9 px-4 text-left text-xs font-medium text-muted-foreground">
                     Default
                   </th>
+                  <th
+                    className="h-9 px-4 text-left text-xs font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
+                    onClick={() => {
+                      toggleColSort('mv')
+                    }}
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      Used by
+                      {colSortIcon('mv')}
+                    </span>
+                  </th>
                   <th className="h-9 px-4 text-left text-xs font-medium text-muted-foreground">
-                    Used by
+                    Impact
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {tableColumns.map((col) => {
+                {sortedColumns.map((col) => {
                   const mvCount = mvCounts.get(col.name)
                   return (
                     <tr
@@ -140,6 +218,18 @@ export function TableDetailPage() {
                             {mvCount} MV{mvCount > 1 ? 's' : ''}
                           </Badge>
                         ) : null}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <button
+                          onClick={() => {
+                            handleDropColumn(col.name)
+                          }}
+                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                          title={`Analyze: ALTER TABLE ${database}.${name} DROP COLUMN ${col.name}`}
+                        >
+                          <Zap size={11} />
+                          Drop?
+                        </button>
                       </td>
                     </tr>
                   )

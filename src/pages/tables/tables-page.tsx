@@ -1,5 +1,5 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, Search } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Search } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Badge } from '@/components/ui/badge'
 import { getEngineVariant } from '@/components/ui/engine-variant'
@@ -22,6 +22,28 @@ function getCompression(t: RawTableRow): number {
   return numVal(t.data_compressed_bytes) / total
 }
 
+function SkeletonRow() {
+  return (
+    <tr className="border-b border-border last:border-0">
+      <td className="px-4 py-3">
+        <div className="h-4 w-32 rounded bg-muted animate-pulse" />
+      </td>
+      <td className="px-4 py-3">
+        <div className="h-5 w-20 rounded bg-muted animate-pulse" />
+      </td>
+      <td className="px-4 py-3">
+        <div className="h-4 w-16 rounded bg-muted animate-pulse" />
+      </td>
+      <td className="px-4 py-3">
+        <div className="h-4 w-16 rounded bg-muted animate-pulse" />
+      </td>
+      <td className="px-4 py-3">
+        <div className="h-4 w-12 rounded bg-muted animate-pulse" />
+      </td>
+    </tr>
+  )
+}
+
 export function TablesPage() {
   const navigate = useNavigate()
   const tables = useSchemaStore((s) => s.tables)
@@ -32,6 +54,7 @@ export function TablesPage() {
   const [engineFilter, setEngineFilter] = useState('')
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const engines = useMemo(() => {
     const set = new Set(tables.map((t) => t.engine))
@@ -84,10 +107,49 @@ export function TablesPage() {
     return sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
   }
 
+  // Esc to clear filter
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape' && document.activeElement === inputRef.current) {
+        setFilter('')
+        setEngineFilter('')
+        inputRef.current?.blur()
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => {
+      window.removeEventListener('keydown', handleKey)
+    }
+  }, [])
+
   if (!tablesReady && status === 'loading') {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 size={24} className="animate-spin text-muted-foreground" />
+      <div>
+        <div className="mb-4 flex items-center gap-3">
+          <div className="h-9 w-64 rounded-md bg-muted animate-pulse" />
+          <div className="h-9 w-44 rounded-md bg-muted animate-pulse" />
+        </div>
+        <div className="rounded-lg border border-border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/50">
+                {['Name', 'Engine', 'Rows', 'Size', 'Compression'].map((h) => (
+                  <th
+                    key={h}
+                    className="h-10 px-4 text-left text-xs font-medium text-muted-foreground"
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 8 }, (_, i) => (
+                <SkeletonRow key={i} />
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     )
   }
@@ -101,7 +163,8 @@ export function TablesPage() {
             className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
           />
           <Input
-            placeholder="Filter tables..."
+            ref={inputRef}
+            placeholder="Filter tables... (press / to focus)"
             value={filter}
             onChange={(e) => {
               setFilter(e.target.value)
@@ -128,62 +191,82 @@ export function TablesPage() {
         </span>
       </div>
 
-      <div className="rounded-lg border border-border overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-muted/50">
-              {(
-                [
-                  ['name', 'Name'],
-                  ['engine', 'Engine'],
-                  ['total_rows', 'Rows'],
-                  ['total_bytes', 'Size'],
-                  ['compression', 'Compression'],
-                ] as [SortField, string][]
-              ).map(([field, label]) => (
-                <th
-                  key={field}
-                  className="h-10 px-4 text-left text-xs font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
+      {tablesReady && tables.length === 0 && (
+        <div className="flex flex-col items-center justify-center h-64 rounded-lg border border-border text-center">
+          <p className="text-sm font-medium text-muted-foreground">No tables found</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            No tables found in this database. Check your connection settings.
+          </p>
+        </div>
+      )}
+
+      {tables.length > 0 && filtered.length === 0 && (filter || engineFilter) && (
+        <div className="flex flex-col items-center justify-center h-64 rounded-lg border border-border text-center">
+          <p className="text-sm font-medium text-muted-foreground">No matching tables</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Try adjusting your filter or engine selection.
+          </p>
+        </div>
+      )}
+
+      {filtered.length > 0 && (
+        <div className="rounded-lg border border-border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/50">
+                {(
+                  [
+                    ['name', 'Name'],
+                    ['engine', 'Engine'],
+                    ['total_rows', 'Rows'],
+                    ['total_bytes', 'Size'],
+                    ['compression', 'Compression'],
+                  ] as [SortField, string][]
+                ).map(([field, label]) => (
+                  <th
+                    key={field}
+                    className="h-10 px-4 text-left text-xs font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
+                    onClick={() => {
+                      toggleSort(field)
+                    }}
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      {label}
+                      <SortIcon field={field} />
+                    </span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((t) => (
+                <tr
+                  key={`${t.database}.${t.name}`}
+                  className="border-b border-border last:border-0 hover:bg-muted/30 cursor-pointer transition-colors"
                   onClick={() => {
-                    toggleSort(field)
+                    void navigate(`/tables/${t.database}/${t.name}`)
                   }}
                 >
-                  <span className="inline-flex items-center gap-1.5">
-                    {label}
-                    <SortIcon field={field} />
-                  </span>
-                </th>
+                  <td className="px-4 py-3">
+                    <span className="font-medium">{t.name}</span>
+                    <span className="ml-2 text-xs text-muted-foreground">{t.database}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge variant={getEngineVariant(t.engine)}>{t.engine}</Badge>
+                  </td>
+                  <td className="px-4 py-3 tabular-nums">{formatNumber(numVal(t.total_rows))}</td>
+                  <td className="px-4 py-3 tabular-nums">{formatBytes(numVal(t.total_bytes))}</td>
+                  <td className="px-4 py-3 tabular-nums">
+                    {numVal(t.total_bytes) > 0
+                      ? `${(getCompression(t) * 100).toFixed(1)}%`
+                      : '\u2014'}
+                  </td>
+                </tr>
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((t) => (
-              <tr
-                key={`${t.database}.${t.name}`}
-                className="border-b border-border last:border-0 hover:bg-muted/30 cursor-pointer transition-colors"
-                onClick={() => {
-                  void navigate(`/tables/${t.database}/${t.name}`)
-                }}
-              >
-                <td className="px-4 py-3">
-                  <span className="font-medium">{t.name}</span>
-                  <span className="ml-2 text-xs text-muted-foreground">{t.database}</span>
-                </td>
-                <td className="px-4 py-3">
-                  <Badge variant={getEngineVariant(t.engine)}>{t.engine}</Badge>
-                </td>
-                <td className="px-4 py-3 tabular-nums">{formatNumber(numVal(t.total_rows))}</td>
-                <td className="px-4 py-3 tabular-nums">{formatBytes(numVal(t.total_bytes))}</td>
-                <td className="px-4 py-3 tabular-nums">
-                  {numVal(t.total_bytes) > 0
-                    ? `${(getCompression(t) * 100).toFixed(1)}%`
-                    : '\u2014'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }

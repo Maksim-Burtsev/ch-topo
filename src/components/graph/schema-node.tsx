@@ -8,6 +8,8 @@ interface SchemaNodeData {
   engine: string
   nodeType: NodeType
   rows?: string
+  size?: string
+  height?: number
   [key: string]: unknown
 }
 
@@ -48,10 +50,11 @@ export function SchemaNode({ data }: NodeProps) {
           style.bg,
           'bg-card',
         )}
+        style={d.height ? { minHeight: d.height } : undefined}
       >
         <div className="flex items-center gap-2 mb-1">
-          <span className={cn('h-2 w-2 rounded-full', style.dot)} />
-          <span className="text-xs font-semibold">{d.label}</span>
+          <span className={cn('h-2 w-2 rounded-full shrink-0', style.dot)} />
+          <span className="text-xs font-semibold truncate">{d.label}</span>
         </div>
         <div className="text-[10px] text-muted-foreground">{d.engine}</div>
         {d.rows && <div className="text-[10px] text-muted-foreground mt-0.5">{d.rows} rows</div>}

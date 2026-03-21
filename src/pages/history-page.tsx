@@ -1,8 +1,25 @@
-import { AlertTriangle, Loader2 } from 'lucide-react'
+import { AlertTriangle, History } from 'lucide-react'
 import { useEffect } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { useConnectionStore } from '@/stores/connection-store'
 import { useHistoryStore } from '@/stores/history-store'
+
+function SkeletonEntry() {
+  return (
+    <div className="relative flex gap-4 pb-8 last:pb-0">
+      <div className="relative z-10 mt-1.5">
+        <div className="h-[10px] w-[10px] rounded-full bg-muted animate-pulse" />
+      </div>
+      <div className="flex-1 rounded-lg border border-border bg-card p-4">
+        <div className="mb-2 flex items-center justify-between">
+          <div className="h-4 w-40 rounded bg-muted animate-pulse" />
+          <div className="h-4 w-20 rounded bg-muted animate-pulse" />
+        </div>
+        <div className="h-12 w-full rounded bg-muted/50 animate-pulse" />
+      </div>
+    </div>
+  )
+}
 
 export function HistoryPage() {
   const { status, entries, error, loadHistory } = useHistoryStore()
@@ -16,8 +33,18 @@ export function HistoryPage() {
 
   if (status === 'loading') {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 size={24} className="animate-spin text-muted-foreground" />
+      <div className="max-w-3xl">
+        <p className="mb-6 text-sm text-muted-foreground">
+          Recent DDL operations from system.query_log.
+        </p>
+        <div className="relative">
+          <div className="absolute left-[19px] top-2 bottom-2 w-px bg-border" />
+          <div className="space-y-0">
+            {Array.from({ length: 4 }, (_, i) => (
+              <SkeletonEntry key={i} />
+            ))}
+          </div>
+        </div>
       </div>
     )
   }
@@ -41,7 +68,15 @@ export function HistoryPage() {
   if (entries.length === 0) {
     return (
       <div className="max-w-3xl">
-        <p className="text-sm text-muted-foreground">No DDL operations found in query_log.</p>
+        <div className="flex flex-col items-center justify-center h-64 text-center">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card">
+            <History size={24} className="text-muted-foreground" />
+          </div>
+          <p className="text-sm font-medium text-muted-foreground">No DDL history found</p>
+          <p className="mt-1 text-xs text-muted-foreground max-w-sm">
+            ClickHouse may not have query_log enabled, or no DDL operations have been recorded yet.
+          </p>
+        </div>
       </div>
     )
   }

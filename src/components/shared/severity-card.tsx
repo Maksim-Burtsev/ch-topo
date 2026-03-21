@@ -52,7 +52,7 @@ export function SeverityCard({ impact }: SeverityCardProps) {
           <p className="mt-1 text-xs text-muted-foreground leading-relaxed">{impact.reason}</p>
         </div>
       </div>
-      <pre className="mt-3 rounded bg-black/30 px-3 py-2 text-xs text-muted-foreground overflow-x-auto">
+      <pre className="mt-3 rounded bg-muted/50 px-3 py-2 text-xs text-muted-foreground overflow-x-auto">
         {impact.ddlFragment}
       </pre>
     </div>
