@@ -232,21 +232,23 @@ export function GraphPage() {
   }, [computed.edges, setEdges])
 
   // Highlight connected nodes/edges on selection
-  const highlightedIds = useMemo(() => {
-    if (!selectedId) return null
+  const { highlightedIds, selectedNodeId } = useMemo(() => {
+    if (!selectedId) return { highlightedIds: null, selectedNodeId: null }
     let matchId: string | null = null
     if (computed.nodes.some((n) => n.id === selectedId)) {
       matchId = selectedId
     } else if (computed.nodes.some((n) => n.id === `dict_${selectedId}`)) {
       matchId = `dict_${selectedId}`
     }
-    if (!matchId) return null
-    return getConnectedIds(matchId, computed.edges)
+    if (!matchId) return { highlightedIds: null, selectedNodeId: null }
+    return { highlightedIds: getConnectedIds(matchId, computed.edges), selectedNodeId: matchId }
   }, [selectedId, computed.nodes, computed.edges])
 
   useEffect(() => {
     if (!highlightedIds) {
-      setNodes((nds) => nds.map((n) => ({ ...n, className: '' })))
+      setNodes((nds) =>
+        nds.map((n) => ({ ...n, className: '', data: { ...n.data, selected: false } })),
+      )
       setEdges((eds) => eds.map((e) => ({ ...e, className: '', style: { ...e.style } })))
       return
     }
@@ -255,6 +257,7 @@ export function GraphPage() {
       nds.map((n) => ({
         ...n,
         className: highlightedIds.has(n.id) ? '' : 'opacity-20',
+        data: { ...n.data, selected: n.id === selectedNodeId },
       })),
     )
     setEdges((eds) =>
@@ -266,7 +269,7 @@ export function GraphPage() {
         }
       }),
     )
-  }, [highlightedIds, setNodes, setEdges])
+  }, [highlightedIds, selectedNodeId, setNodes, setEdges])
 
   const onNodeClick: NodeMouseHandler = useCallback((_event, node) => {
     const tableId = node.id.startsWith('dict_') ? node.id.slice(5) : node.id
