@@ -7,11 +7,12 @@ import {
   useEdgesState,
   useNodesState,
 } from '@xyflow/react'
-import type { Edge, Node } from '@xyflow/react'
+import type { Edge, Node, NodeMouseHandler } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { Loader2 } from 'lucide-react'
-import { useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { SchemaNode } from '@/components/graph/schema-node'
+import { TableDetailPanel } from '@/components/graph/table-detail-panel'
 import type { RawTableRow } from '@/lib/clickhouse/types'
 import type { DependencyGraph } from '@/lib/graph/types'
 import { formatNumber } from '@/lib/utils'
@@ -38,7 +39,6 @@ function buildGraphData(
   const nodes: Node[] = []
   const edges: Edge[] = []
 
-  // Collect target table names from graph
   const targetTableNames = new Set<string>()
   if (graph) {
     for (const target of graph.mvTargets.values()) {
@@ -120,7 +120,6 @@ function buildGraphData(
     })
   })
 
-  // Build edges from graph data
   if (graph) {
     for (const [mvName, sourcesList] of graph.mvSources) {
       for (const src of sourcesList) {
@@ -170,9 +169,13 @@ function buildGraphData(
 
 export function GraphPage() {
   const tables = useSchemaStore((s) => s.tables)
+  const columns = useSchemaStore((s) => s.columns)
+  const allIndices = useSchemaStore((s) => s.indices)
   const dictionaries = useSchemaStore((s) => s.dictionaries)
   const tablesReady = useSchemaStore((s) => s.tablesReady)
   const graph = useGraphStore((s) => s.graph)
+
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const computed = useMemo(
     () => buildGraphData(tables, dictionaries, graph),
@@ -190,6 +193,41 @@ export function GraphPage() {
     setEdges(computed.edges)
   }, [computed.edges, setEdges])
 
+  const onNodeClick: NodeMouseHandler = useCallback((_event, node) => {
+    // dict nodes have id like "dict_analytics.regions" — strip prefix
+    const tableId = node.id.startsWith('dict_') ? node.id.slice(5) : node.id
+    setSelectedId(tableId)
+  }, [])
+
+  const onPaneClick = useCallback(() => {
+    setSelectedId(null)
+  }, [])
+
+  // Resolve selected table data
+  const selectedTable = useMemo(() => {
+    if (!selectedId) return null
+    const [db, name] = selectedId.split('.')
+    return tables.find((t) => t.database === db && t.name === name) ?? null
+  }, [selectedId, tables])
+
+  const selectedColumns = useMemo(() => {
+    if (!selectedId) return []
+    const [db, name] = selectedId.split('.')
+    return columns.filter((c) => c.database === db && c.table === name)
+  }, [selectedId, columns])
+
+  // Navigate to a dependency node in the graph
+  const handleNavigate = useCallback(
+    (tableId: string) => {
+      // Check if node exists (might be a dict_ prefixed node)
+      const nodeExists = computed.nodes.some((n) => n.id === tableId || n.id === `dict_${tableId}`)
+      if (nodeExists) {
+        setSelectedId(tableId)
+      }
+    },
+    [computed.nodes],
+  )
+
   if (!tablesReady) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -199,59 +237,78 @@ export function GraphPage() {
   }
 
   return (
-    <div className="h-[calc(100vh-7rem)] -m-6 relative">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        nodeTypes={nodeTypes}
-        fitView
-        minZoom={0.3}
-        maxZoom={2}
-        proOptions={{ hideAttribution: true }}
-      >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#27272a" />
-        <Controls />
-        <MiniMap
-          nodeColor={(node) => {
-            const nt = (node.data as { nodeType: string }).nodeType
-            if (nt === 'mv') return '#a855f7'
-            if (nt === 'target') return '#f87171'
-            if (nt === 'dictionary') return '#fbbf24'
-            return '#22c55e'
-          }}
-          maskColor="rgba(0,0,0,0.6)"
-        />
-      </ReactFlow>
+    <div className="h-[calc(100vh-7rem)] -m-6 relative flex">
+      <div className="flex-1 relative">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeClick={onNodeClick}
+          onPaneClick={onPaneClick}
+          nodeTypes={nodeTypes}
+          fitView
+          minZoom={0.3}
+          maxZoom={2}
+          proOptions={{ hideAttribution: true }}
+        >
+          <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#27272a" />
+          <Controls />
+          <MiniMap
+            nodeColor={(node) => {
+              const nt = (node.data as { nodeType: string }).nodeType
+              if (nt === 'mv') return '#a855f7'
+              if (nt === 'target') return '#f87171'
+              if (nt === 'dictionary') return '#fbbf24'
+              return '#22c55e'
+            }}
+            maskColor="rgba(0,0,0,0.6)"
+          />
+        </ReactFlow>
 
-      {/* Legend */}
-      <div className="absolute bottom-4 left-14 flex items-center gap-4 rounded-lg border border-border bg-card/90 backdrop-blur px-4 py-2.5 text-xs">
-        <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-          Source Table
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-purple-500" />
-          Materialized View
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-red-400" />
-          Target Table
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
-          Dictionary
-        </span>
-        <span className="flex items-center gap-1.5 ml-2 border-l border-border pl-4">
-          <span className="w-6 border-t-2 border-dashed border-purple-500" />
-          MV reads
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-6 border-t-2 border-red-400" />
-          MV writes
-        </span>
+        {/* Legend */}
+        <div className="absolute bottom-4 left-14 flex items-center gap-4 rounded-lg border border-border bg-card/90 backdrop-blur px-4 py-2.5 text-xs">
+          <span className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+            Source Table
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-purple-500" />
+            Materialized View
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-red-400" />
+            Target Table
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
+            Dictionary
+          </span>
+          <span className="flex items-center gap-1.5 ml-2 border-l border-border pl-4">
+            <span className="w-6 border-t-2 border-dashed border-purple-500" />
+            MV reads
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-6 border-t-2 border-red-400" />
+            MV writes
+          </span>
+        </div>
       </div>
+
+      {/* Detail Panel */}
+      {selectedTable && selectedId && (
+        <TableDetailPanel
+          tableId={selectedId}
+          table={selectedTable}
+          columns={selectedColumns}
+          indices={allIndices}
+          graph={graph}
+          onClose={() => {
+            setSelectedId(null)
+          }}
+          onNavigate={handleNavigate}
+        />
+      )}
     </div>
   )
 }
