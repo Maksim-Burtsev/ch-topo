@@ -5,12 +5,15 @@ import {
   Controls,
   MiniMap,
   ReactFlow,
+  ReactFlowProvider,
   useEdgesState,
   useNodesState,
+  useReactFlow,
+  useOnViewportChange,
 } from '@xyflow/react'
-import type { Edge, Node, NodeMouseHandler } from '@xyflow/react'
+import type { Edge, Node, NodeMouseHandler, Viewport } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Info, Map } from 'lucide-react'
+import { ChevronDown, ChevronRight, Info, Map } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { SchemaNode } from '@/components/graph/schema-node'
 import { TableDetailPanel } from '@/components/graph/table-detail-panel'
@@ -18,11 +21,99 @@ import { Select } from '@/components/ui/select'
 import type { RawTableRow } from '@/lib/clickhouse/types'
 import type { DependencyGraph } from '@/lib/graph/types'
 import { formatBytes, formatNumber } from '@/lib/utils'
+import { useConnectionStore } from '@/stores/connection-store'
 import { useGraphStore } from '@/stores/graph-store'
+import { useGraphUiStore } from '@/stores/graph-ui-store'
 import { useSchemaStore } from '@/stores/schema-store'
 import { useThemeStore } from '@/stores/theme-store'
 
-const nodeTypes = { schema: SchemaNode }
+function getViewportKey(): string {
+  const { host, port } = useConnectionStore.getState()
+  return `chtopo_viewport_${host}:${port}`
+}
+
+function saveViewport(vp: Viewport) {
+  try {
+    sessionStorage.setItem(getViewportKey(), JSON.stringify(vp))
+  } catch {
+    // sessionStorage unavailable
+  }
+}
+
+function loadViewport(): Viewport | null {
+  try {
+    const raw = sessionStorage.getItem(getViewportKey())
+    if (!raw) return null
+    const parsed: unknown = JSON.parse(raw)
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      'x' in parsed &&
+      'y' in parsed &&
+      'zoom' in parsed &&
+      typeof (parsed as Viewport).x === 'number' &&
+      typeof (parsed as Viewport).y === 'number' &&
+      typeof (parsed as Viewport).zoom === 'number'
+    ) {
+      return parsed as Viewport
+    }
+  } catch {
+    // sessionStorage unavailable or corrupt data
+  }
+  return null
+}
+
+function getUnlinkedCollapsedKey(): string {
+  const { host, port } = useConnectionStore.getState()
+  return `chtopo_unlinked_collapsed_${host}:${port}`
+}
+
+function loadUnlinkedCollapsed(): boolean {
+  try {
+    return sessionStorage.getItem(getUnlinkedCollapsedKey()) === '1'
+  } catch {
+    // sessionStorage unavailable
+  }
+  return false
+}
+
+function saveUnlinkedCollapsed(collapsed: boolean) {
+  try {
+    if (collapsed) {
+      sessionStorage.setItem(getUnlinkedCollapsedKey(), '1')
+    } else {
+      sessionStorage.removeItem(getUnlinkedCollapsedKey())
+    }
+  } catch {
+    // sessionStorage unavailable
+  }
+}
+
+function UnlinkedHeaderNode({ data }: { data: Record<string, unknown> }) {
+  const count = data.count as number
+  const collapsed = data.collapsed as boolean
+  const onToggle = data.onToggle as () => void
+  const width = data.width as number
+
+  return (
+    <div style={{ width }} className="select-none">
+      <div className="border-t border-border mb-3" />
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggle()
+        }}
+        className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+      >
+        {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+        <span>Unlinked tables</span>
+        <span>({count})</span>
+      </button>
+    </div>
+  )
+}
+
+const nodeTypes = { schema: SchemaNode, 'unlinked-header': UnlinkedHeaderNode }
 
 const NODE_WIDTH = 180
 const NODE_HEIGHT = 70
@@ -47,12 +138,56 @@ function getNodeHeight(table: RawTableRow): number {
   return MIN_NODE_HEIGHT + normalized * (MAX_NODE_HEIGHT - MIN_NODE_HEIGHT)
 }
 
-function layoutWithDagre(nodes: Node[], edges: Edge[]): Node[] {
+interface LayoutResult {
+  connected: Node[]
+  isolated: Node[]
+  isolatedIds: Set<string>
+  /** Y coordinate where isolated zone starts (below divider) */
+  isolatedStartY: number
+  /** X coordinate where isolated zone starts (left-aligned with connected) */
+  isolatedStartX: number
+}
+
+const ISOLATED_COLS = 5
+const ISOLATED_CELL_W = NODE_WIDTH + 40
+const ISOLATED_CELL_H = MAX_NODE_HEIGHT + 40
+const HEADER_HEIGHT = 40
+const DIVIDER_MARGIN = 60
+
+function layoutWithDagre(nodes: Node[], edges: Edge[]): LayoutResult {
+  // Split nodes into connected (have at least one edge) and isolated (zero edges)
+  const connectedNodeIds = new Set<string>()
+  for (const edge of edges) {
+    connectedNodeIds.add(edge.source)
+    connectedNodeIds.add(edge.target)
+  }
+
+  const connectedNodes = nodes.filter((n) => connectedNodeIds.has(n.id))
+  const isolatedNodes = nodes.filter((n) => !connectedNodeIds.has(n.id))
+  const isolatedIds = new Set(isolatedNodes.map((n) => n.id))
+
+  // If all nodes are isolated (no edges at all), just grid-layout everything
+  if (connectedNodes.length === 0) {
+    const gridded = isolatedNodes.map((node, i) => {
+      const col = i % ISOLATED_COLS
+      const row = Math.floor(i / ISOLATED_COLS)
+      return {
+        ...node,
+        position: {
+          x: col * ISOLATED_CELL_W,
+          y: row * ISOLATED_CELL_H,
+        },
+      }
+    })
+    return { connected: [], isolated: gridded, isolatedIds, isolatedStartY: 0, isolatedStartX: 0 }
+  }
+
+  // Layout connected nodes with dagre
   const g = new dagre.graphlib.Graph()
   g.setDefaultEdgeLabel(() => ({}))
   g.setGraph({ rankdir: 'LR', ranksep: 200, nodesep: 40, edgesep: 20 })
 
-  for (const node of nodes) {
+  for (const node of connectedNodes) {
     const h = (node.data as { height?: number }).height ?? NODE_HEIGHT
     g.setNode(node.id, { width: NODE_WIDTH, height: h })
   }
@@ -63,7 +198,7 @@ function layoutWithDagre(nodes: Node[], edges: Edge[]): Node[] {
 
   dagre.layout(g)
 
-  return nodes.map((node) => {
+  const positionedConnected = connectedNodes.map((node) => {
     const pos = g.node(node.id) as { x: number; y: number }
     const h = (node.data as { height?: number }).height ?? NODE_HEIGHT
     return {
@@ -71,6 +206,40 @@ function layoutWithDagre(nodes: Node[], edges: Edge[]): Node[] {
       position: { x: pos.x - NODE_WIDTH / 2, y: pos.y - h / 2 },
     }
   })
+
+  // Compute bounds of connected graph
+  let maxY = 0
+  let minX = Infinity
+  for (const node of positionedConnected) {
+    const h = (node.data as { height?: number }).height ?? NODE_HEIGHT
+    maxY = Math.max(maxY, node.position.y + h)
+    minX = Math.min(minX, node.position.x)
+  }
+  if (!isFinite(minX)) minX = 0
+
+  // Position isolated nodes in a grid below the connected graph
+  const headerY = maxY + DIVIDER_MARGIN
+  const nodesStartY = headerY + HEADER_HEIGHT
+
+  const positionedIsolated = isolatedNodes.map((node, i) => {
+    const col = i % ISOLATED_COLS
+    const row = Math.floor(i / ISOLATED_COLS)
+    return {
+      ...node,
+      position: {
+        x: minX + col * ISOLATED_CELL_W,
+        y: nodesStartY + row * ISOLATED_CELL_H,
+      },
+    }
+  })
+
+  return {
+    connected: positionedConnected,
+    isolated: positionedIsolated,
+    isolatedIds,
+    isolatedStartY: headerY,
+    isolatedStartX: minX,
+  }
 }
 
 function buildGraphData(
@@ -183,8 +352,8 @@ function buildGraphData(
     }
   }
 
-  const laidOutNodes = layoutWithDagre(nodes, edges)
-  return { nodes: laidOutNodes, edges }
+  const layout = layoutWithDagre(nodes, edges)
+  return { layout, edges }
 }
 
 function getConnectedIds(nodeId: string, edges: Edge[]): Set<string> {
@@ -200,6 +369,14 @@ function getConnectedIds(nodeId: string, edges: Edge[]): Set<string> {
 }
 
 export function GraphPage() {
+  return (
+    <ReactFlowProvider>
+      <GraphPageInner />
+    </ReactFlowProvider>
+  )
+}
+
+function GraphPageInner() {
   const tables = useSchemaStore((s) => s.tables)
   const columns = useSchemaStore((s) => s.columns)
   const allIndices = useSchemaStore((s) => s.indices)
@@ -207,11 +384,34 @@ export function GraphPage() {
   const tablesReady = useSchemaStore((s) => s.tablesReady)
   const graph = useGraphStore((s) => s.graph)
   const theme = useThemeStore((s) => s.theme)
+  const { fitView, setViewport } = useReactFlow()
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [databaseFilter, setDatabaseFilter] = useState('')
-  const [showMinimap, setShowMinimap] = useState(true)
-  const [showLegend, setShowLegend] = useState(true)
+  const [unlinkedCollapsed, setUnlinkedCollapsed] = useState(loadUnlinkedCollapsed)
+  const showMinimap = useGraphUiStore((s) => s.showMinimap)
+  const showLegend = useGraphUiStore((s) => s.showLegend)
+  const toggleMinimap = useGraphUiStore((s) => s.toggleMinimap)
+  const setShowLegend = useGraphUiStore((s) => s.setShowLegend)
+
+  const toggleUnlinkedCollapsed = useCallback(() => {
+    setUnlinkedCollapsed((prev) => {
+      const next = !prev
+      saveUnlinkedCollapsed(next)
+      return next
+    })
+  }, [])
+
+  // Debounced viewport persistence to sessionStorage
+  const viewportTimer = useRef<ReturnType<typeof setTimeout>>(null)
+  useOnViewportChange({
+    onChange: useCallback((vp: Viewport) => {
+      if (viewportTimer.current) clearTimeout(viewportTimer.current)
+      viewportTimer.current = setTimeout(() => {
+        saveViewport(vp)
+      }, 300)
+    }, []),
+  })
 
   const databases = useMemo(() => {
     const set = new Set(tables.map((t) => t.database))
@@ -223,45 +423,101 @@ export function GraphPage() {
     [tables, dictionaries, graph, databaseFilter],
   )
 
+  // Build the final node list: connected + header + isolated (if expanded)
+  const allNodes = useMemo(() => {
+    const { layout } = computed
+    const hasConnected = layout.connected.length > 0
+    const hasIsolated = layout.isolated.length > 0
+
+    // All isolated, no connected: just show grid, no header
+    if (!hasConnected && hasIsolated) return layout.isolated
+    // No isolated: just connected
+    if (!hasIsolated) return layout.connected
+
+    // Both: connected + header + optionally isolated
+    const headerNode: Node = {
+      id: '__unlinked_header__',
+      type: 'unlinked-header',
+      position: { x: layout.isolatedStartX, y: layout.isolatedStartY },
+      draggable: false,
+      selectable: false,
+      connectable: false,
+      data: {
+        count: layout.isolated.length,
+        collapsed: unlinkedCollapsed,
+        onToggle: toggleUnlinkedCollapsed,
+        width: (ISOLATED_COLS - 1) * ISOLATED_CELL_W + NODE_WIDTH,
+      },
+    }
+
+    if (unlinkedCollapsed) {
+      return [...layout.connected, headerNode]
+    }
+    return [...layout.connected, headerNode, ...layout.isolated]
+  }, [computed, unlinkedCollapsed, toggleUnlinkedCollapsed])
+
+  const allComputedNodes = useMemo(() => {
+    const { layout } = computed
+    return [...layout.connected, ...layout.isolated]
+  }, [computed])
+
   const [nodes, setNodes, onNodesChange] = useNodesState([] as Node[])
   const [edges, setEdges, onEdgesChange] = useEdgesState([] as Edge[])
 
+  // Apply layout and restore viewport (or fitView) after nodes are placed
   useEffect(() => {
-    setNodes(computed.nodes)
-  }, [computed.nodes, setNodes])
-
-  useEffect(() => {
+    setNodes(allNodes)
     setEdges(computed.edges)
-  }, [computed.edges, setEdges])
+
+    if (allNodes.length === 0) return
+
+    // Wait for React Flow to measure nodes before adjusting viewport
+    requestAnimationFrame(() => {
+      const saved = loadViewport()
+      if (saved) {
+        void setViewport(saved)
+      } else {
+        void fitView({ maxZoom: 1 })
+      }
+    })
+  }, [allNodes, computed.edges, setNodes, setEdges, fitView, setViewport])
 
   // Highlight connected nodes/edges on selection
   const { highlightedIds, selectedNodeId } = useMemo(() => {
     if (!selectedId) return { highlightedIds: null, selectedNodeId: null }
     let matchId: string | null = null
-    if (computed.nodes.some((n) => n.id === selectedId)) {
+    if (allComputedNodes.some((n) => n.id === selectedId)) {
       matchId = selectedId
-    } else if (computed.nodes.some((n) => n.id === `dict_${selectedId}`)) {
+    } else if (allComputedNodes.some((n) => n.id === `dict_${selectedId}`)) {
       matchId = `dict_${selectedId}`
     }
     if (!matchId) return { highlightedIds: null, selectedNodeId: null }
     return { highlightedIds: getConnectedIds(matchId, computed.edges), selectedNodeId: matchId }
-  }, [selectedId, computed.nodes, computed.edges])
+  }, [selectedId, allComputedNodes, computed.edges])
 
   useEffect(() => {
     if (!highlightedIds) {
       setNodes((nds) =>
-        nds.map((n) => ({ ...n, className: '', data: { ...n.data, selected: false } })),
+        nds.map((n) =>
+          n.type === 'unlinked-header'
+            ? n
+            : { ...n, className: '', data: { ...n.data, selected: false } },
+        ),
       )
       setEdges((eds) => eds.map((e) => ({ ...e, className: '', style: { ...e.style } })))
       return
     }
 
     setNodes((nds) =>
-      nds.map((n) => ({
-        ...n,
-        className: highlightedIds.has(n.id) ? '' : 'opacity-20',
-        data: { ...n.data, selected: n.id === selectedNodeId },
-      })),
+      nds.map((n) =>
+        n.type === 'unlinked-header'
+          ? n
+          : {
+              ...n,
+              className: highlightedIds.has(n.id) ? '' : 'opacity-20',
+              data: { ...n.data, selected: n.id === selectedNodeId },
+            },
+      ),
     )
     setEdges((eds) =>
       eds.map((e) => {
@@ -275,6 +531,7 @@ export function GraphPage() {
   }, [highlightedIds, selectedNodeId, setNodes, setEdges])
 
   const onNodeClick: NodeMouseHandler = useCallback((_event, node) => {
+    if (node.type === 'unlinked-header') return
     const tableId = node.id.startsWith('dict_') ? node.id.slice(5) : node.id
     setSelectedId(tableId)
   }, [])
@@ -299,12 +556,14 @@ export function GraphPage() {
   // Navigate to a dependency node in the graph
   const handleNavigate = useCallback(
     (tableId: string) => {
-      const nodeExists = computed.nodes.some((n) => n.id === tableId || n.id === `dict_${tableId}`)
+      const nodeExists = allComputedNodes.some(
+        (n) => n.id === tableId || n.id === `dict_${tableId}`,
+      )
       if (nodeExists) {
         setSelectedId(tableId)
       }
     },
-    [computed.nodes],
+    [allComputedNodes],
   )
 
   // Tooltip state
@@ -317,6 +576,7 @@ export function GraphPage() {
 
   const onNodeMouseEnter: NodeMouseHandler = useCallback(
     (_event, node) => {
+      if (node.type === 'unlinked-header') return
       if (tooltipTimeout.current) clearTimeout(tooltipTimeout.current)
       const tableId = node.id.startsWith('dict_') ? node.id.slice(5) : node.id
       if (selectedId === tableId) return
@@ -397,7 +657,6 @@ export function GraphPage() {
           onNodeMouseLeave={onNodeMouseLeave}
           onPaneClick={onPaneClick}
           nodeTypes={nodeTypes}
-          fitView
           minZoom={0.3}
           maxZoom={2}
           colorMode={theme}
@@ -428,9 +687,7 @@ export function GraphPage() {
 
         {/* Minimap toggle */}
         <button
-          onClick={() => {
-            setShowMinimap((v) => !v)
-          }}
+          onClick={toggleMinimap}
           title={showMinimap ? 'Hide minimap' : 'Show minimap'}
           className={`absolute bottom-4 right-4 z-10 rounded-md border border-border p-1.5 transition-colors ${
             showMinimap
@@ -457,14 +714,14 @@ export function GraphPage() {
         )}
 
         {/* Empty state: no MVs */}
-        {computed.nodes.length > 0 && !hasMVs && (
+        {allComputedNodes.length > 0 && !hasMVs && (
           <div className="absolute top-3 right-3 z-10 rounded-lg border border-border bg-card/90 backdrop-blur px-3 py-2 text-xs text-muted-foreground max-w-[220px]">
             No materialized views — graph shows tables only.
           </div>
         )}
 
         {/* Empty state: no tables */}
-        {computed.nodes.length === 0 && (
+        {allComputedNodes.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center text-sm text-muted-foreground">
               <p className="font-medium">No tables found</p>
