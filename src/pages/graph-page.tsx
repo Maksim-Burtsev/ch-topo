@@ -566,41 +566,6 @@ function GraphPageInner() {
     [allComputedNodes],
   )
 
-  // Tooltip state
-  const [tooltip, setTooltip] = useState<{
-    x: number
-    y: number
-    data: { label: string; engine: string; rows?: string; size?: string }
-  } | null>(null)
-  const tooltipTimeout = useRef<ReturnType<typeof setTimeout>>(null)
-
-  const onNodeMouseEnter: NodeMouseHandler = useCallback(
-    (_event, node) => {
-      if (node.type === 'unlinked-header') return
-      if (tooltipTimeout.current) clearTimeout(tooltipTimeout.current)
-      const tableId = node.id.startsWith('dict_') ? node.id.slice(5) : node.id
-      if (selectedId === tableId) return
-      const d = node.data as { label: string; engine: string; rows?: string; size?: string }
-      const rect = (_event.target as HTMLElement)
-        .closest('.react-flow__node')
-        ?.getBoundingClientRect()
-      if (rect) {
-        setTooltip({
-          x: rect.right + 8,
-          y: rect.top,
-          data: d,
-        })
-      }
-    },
-    [selectedId],
-  )
-
-  const onNodeMouseLeave: NodeMouseHandler = useCallback(() => {
-    tooltipTimeout.current = setTimeout(() => {
-      setTooltip(null)
-    }, 100)
-  }, [])
-
   // Keyboard: Esc closes detail panel
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -653,8 +618,6 @@ function GraphPageInner() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onNodeClick={onNodeClick}
-          onNodeMouseEnter={onNodeMouseEnter}
-          onNodeMouseLeave={onNodeMouseLeave}
           onPaneClick={onPaneClick}
           nodeTypes={nodeTypes}
           minZoom={0.3}
@@ -697,21 +660,6 @@ function GraphPageInner() {
         >
           <Map size={14} />
         </button>
-
-        {/* Tooltip */}
-        {tooltip && (
-          <div
-            className="fixed z-50 rounded-lg border border-border bg-card px-3 py-2 shadow-lg text-xs pointer-events-none"
-            style={{ left: tooltip.x, top: tooltip.y }}
-          >
-            <div className="font-semibold">{tooltip.data.label}</div>
-            <div className="text-muted-foreground">{tooltip.data.engine}</div>
-            {tooltip.data.rows && (
-              <div className="text-muted-foreground">{tooltip.data.rows} rows</div>
-            )}
-            {tooltip.data.size && <div className="text-muted-foreground">{tooltip.data.size}</div>}
-          </div>
-        )}
 
         {/* Empty state: no MVs */}
         {allComputedNodes.length > 0 && !hasMVs && (
