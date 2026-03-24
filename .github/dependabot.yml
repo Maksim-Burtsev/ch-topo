@@ -1,0 +1,56 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+    groups:
+      react:
+        patterns:
+          - react
+          - react-dom
+          - "@types/react"
+          - "@types/react-dom"
+      vite:
+        patterns:
+          - vite
+          - "@vitejs/*"
+          - "vite-*"
+      styling:
+        patterns:
+          - tailwindcss
+          - "@tailwindcss/*"
+          - class-variance-authority
+          - clsx
+          - tailwind-merge
+      react-flow:
+        patterns:
+          - "@xyflow/*"
+          - reactflow
+      state-and-routing:
+        patterns:
+          - zustand
+          - react-router
+          - react-router-dom
+      dev-tooling:
+        patterns:
+          - eslint
+          - "eslint-*"
+          - "@eslint/*"
+          - typescript
+          - typescript-eslint
+          - "@typescript-eslint/*"
+          - prettier
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+      - ci
