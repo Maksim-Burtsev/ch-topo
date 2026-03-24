@@ -37,15 +37,15 @@
 - [x] Timeout: 30 seconds default, configurable
 
 ### Task 4: Results table component
-- [ ] Create `src/components/playground/results-table.tsx`
-- [ ] Render query results as a table with shadcn/ui Table components
-- [ ] Column headers: name + type (muted)
-- [ ] Sortable columns (client-side sort on click)
-- [ ] Virtual scrolling for large result sets (only render visible rows) — use simple windowing: render first 100 rows, "Load more" button or scroll trigger
-- [ ] Cell rendering: truncate long strings with tooltip on hover, format numbers with locale, format dates
-- [ ] Null values shown as muted "NULL" badge
-- [ ] Empty result: "Query returned 0 rows"
-- [ ] Copy cell value on click
+- [x] Create `src/components/playground/results-table.tsx`
+- [x] Render query results as a table with shadcn/ui Table components
+- [x] Column headers: name + type (muted)
+- [x] Sortable columns (client-side sort on click)
+- [x] Virtual scrolling for large result sets (only render visible rows) — use simple windowing: render first 100 rows, "Load more" button or scroll trigger
+- [x] Cell rendering: truncate long strings with tooltip on hover, format numbers with locale, format dates
+- [x] Null values shown as muted "NULL" badge
+- [x] Empty result: "Query returned 0 rows"
+- [x] Copy cell value on click
 
 ### Task 5: JSON view component
 - [ ] Create `src/components/playground/results-json.tsx`
