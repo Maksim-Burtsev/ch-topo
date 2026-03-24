@@ -28,13 +28,13 @@
 - [x] Trigger on dot (database.table.column) and on space after FROM/JOIN
 
 ### Task 3: Query execution engine
-- [ ] Create `src/lib/playground/execute.ts`
-- [ ] Function `executeQuery(sql: string, client: ClickHouseClient): Promise<QueryResult>`
-- [ ] QueryResult: `{ columns: { name: string, type: string }[], rows: Record<string, unknown>[], elapsed: number, rowsRead: number, bytesRead: number, error?: string }`
-- [ ] Parse response headers for stats: X-ClickHouse-Summary
-- [ ] Handle errors: parse ClickHouse error message, extract line number if available
-- [ ] Support query cancellation via AbortController
-- [ ] Timeout: 30 seconds default, configurable
+- [x] Create `src/lib/playground/execute.ts`
+- [x] Function `executeQuery(sql: string, client: ClickHouseClient): Promise<QueryResult>`
+- [x] QueryResult: `{ columns: { name: string, type: string }[], rows: Record<string, unknown>[], elapsed: number, rowsRead: number, bytesRead: number, error?: string }`
+- [x] Parse response headers for stats: X-ClickHouse-Summary
+- [x] Handle errors: parse ClickHouse error message, extract line number if available
+- [x] Support query cancellation via AbortController
+- [x] Timeout: 30 seconds default, configurable
 
 ### Task 4: Results table component
 - [ ] Create `src/components/playground/results-table.tsx`
