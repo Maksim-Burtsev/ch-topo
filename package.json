@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "@dagrejs/dagre": "^2.0.4",
+    "@monaco-editor/react": "^4.7.0",
     "@tailwindcss/vite": "^4.2.2",
     "@xyflow/react": "^12.10.1",
     "class-variance-authority": "^0.7.1",
