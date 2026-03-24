@@ -230,7 +230,34 @@ type CompletionContext =
   | { kind: 'dot-database'; database: string }
   | { kind: 'dot-table'; database: string; table: string }
   | { kind: 'after-from-join' }
+  | { kind: 'after-select' }
+  | { kind: 'after-where' }
+  | { kind: 'after-group-order' }
+  | { kind: 'keyword' }
   | { kind: 'general' }
+
+/**
+ * Find the FROM table in the current statement so we can suggest its columns.
+ * Returns `database.table` or just `table` if found.
+ */
+function findFromTable(textBefore: string): string | null {
+  // Match the last FROM <table> clause before cursor (handles aliases)
+  const match = textBefore.match(/\bFROM\s+([\w]+(?:\.[\w]+)?)/i)
+  return match?.[1] ?? null
+}
+
+function resolveTable(schema: SchemaDatabase[], ref: string): SchemaTable | null {
+  if (ref.includes('.')) {
+    const [db, tbl] = ref.split('.')
+    const database = schema.find((d) => d.name.toLowerCase() === db?.toLowerCase())
+    return database?.tables.find((t) => t.name.toLowerCase() === tbl?.toLowerCase()) ?? null
+  }
+  for (const db of schema) {
+    const found = db.tables.find((t) => t.name.toLowerCase() === ref.toLowerCase())
+    if (found) return found
+  }
+  return null
+}
 
 function detectContext(
   model: Monaco.editor.ITextModel,
@@ -256,7 +283,7 @@ function detectContext(
     return { kind: 'dot-database', database: singleDotMatch[1] }
   }
 
-  // Check for dot pattern with partial word: database.tab|
+  // Check for dot pattern with partial word: database.table.col|
   const dotPartialMatch = textBeforeOnLine.match(/(\w+)\.(\w+)\.(\w*)$/)
   if (dotPartialMatch?.[1] && dotPartialMatch[2]) {
     return {
@@ -266,17 +293,37 @@ function detectContext(
     }
   }
 
+  // Check for single dot with partial: database.tab|
   const dotSinglePartialMatch = textBeforeOnLine.match(/(\w+)\.(\w*)$/)
   if (dotSinglePartialMatch?.[1]) {
     return { kind: 'dot-database', database: dotSinglePartialMatch[1] }
   }
 
   // Check if cursor is after FROM or JOIN keyword
-  const upperText = textBefore.toUpperCase()
   const fromJoinPattern =
     /\b(FROM|JOIN|LEFT\s+JOIN|RIGHT\s+JOIN|INNER\s+JOIN|CROSS\s+JOIN|FULL\s+JOIN|ANY\s+JOIN|ALL\s+JOIN|GLOBAL\s+JOIN|SEMI\s+JOIN|ANTI\s+JOIN|ARRAY\s+JOIN)\s+\w*$/i
-  if (fromJoinPattern.test(upperText)) {
+  if (fromJoinPattern.test(textBefore)) {
     return { kind: 'after-from-join' }
+  }
+
+  // Check if cursor is after SELECT (suggest columns + functions + *)
+  if (/\bSELECT\s+(?:[\w\s,.*()]+,\s*)?\w*$/i.test(textBefore)) {
+    return { kind: 'after-select' }
+  }
+
+  // Check if cursor is after WHERE/AND/OR/HAVING (suggest columns)
+  if (/\b(WHERE|AND|OR|HAVING)\s+\w*$/i.test(textBefore)) {
+    return { kind: 'after-where' }
+  }
+
+  // Check if cursor is after GROUP BY or ORDER BY (suggest columns)
+  if (/\b(GROUP\s+BY|ORDER\s+BY)\s+(?:[\w\s,]+,\s*)?\w*$/i.test(textBefore)) {
+    return { kind: 'after-group-order' }
+  }
+
+  // Check if we're at line start or after only whitespace — suggest keywords
+  if (/^\s*\w*$/.test(textBeforeOnLine)) {
+    return { kind: 'keyword' }
   }
 
   return { kind: 'general' }
@@ -291,6 +338,131 @@ function makeRange(model: Monaco.editor.ITextModel, position: Monaco.Position): 
     endLineNumber: position.lineNumber,
     startColumn: word.startColumn,
     endColumn: word.endColumn,
+  }
+}
+
+function isSystemDatabase(name: string): boolean {
+  const lower = name.toLowerCase()
+  return lower === 'system' || lower === 'information_schema'
+}
+
+function makeKeywordItem(
+  kw: string,
+  CIK: typeof Monaco.languages.CompletionItemKind,
+  range: Monaco.IRange,
+  sortPrefix: string,
+): Monaco.languages.CompletionItem {
+  return {
+    label: kw,
+    kind: CIK.Keyword,
+    insertText: kw,
+    filterText: kw.toLowerCase(),
+    sortText: `${sortPrefix}${kw.toLowerCase()}`,
+    range,
+  }
+}
+
+function makeFunctionItem(
+  fn: string,
+  CIK: typeof Monaco.languages.CompletionItemKind,
+  range: Monaco.IRange,
+  sortPrefix: string,
+): Monaco.languages.CompletionItem {
+  return {
+    label: fn,
+    kind: CIK.Function,
+    detail: 'function',
+    insertText: fn,
+    filterText: fn.toLowerCase(),
+    sortText: `${sortPrefix}${fn.toLowerCase()}`,
+    range,
+  }
+}
+
+function makeColumnItem(
+  col: SchemaColumn,
+  CIK: typeof Monaco.languages.CompletionItemKind,
+  range: Monaco.IRange,
+  sortPrefix: string,
+): Monaco.languages.CompletionItem {
+  return {
+    label: col.name,
+    kind: CIK.Field,
+    detail: col.type,
+    insertText: col.name,
+    filterText: col.name.toLowerCase(),
+    sortText: `${sortPrefix}${col.name.toLowerCase()}`,
+    range,
+  }
+}
+
+function addColumnsFromContext(
+  suggestions: Monaco.languages.CompletionItem[],
+  schema: SchemaDatabase[],
+  textBefore: string,
+  CIK: typeof Monaco.languages.CompletionItemKind,
+  range: Monaco.IRange,
+  sortPrefix: string,
+) {
+  const fromRef = findFromTable(textBefore)
+  if (fromRef) {
+    const table = resolveTable(schema, fromRef)
+    if (table) {
+      for (const col of table.columns) {
+        suggestions.push(makeColumnItem(col, CIK, range, sortPrefix))
+      }
+      return
+    }
+  }
+  // Fallback: show columns from all non-system tables
+  for (const db of schema) {
+    if (isSystemDatabase(db.name)) continue
+    for (const table of db.tables) {
+      for (const col of table.columns) {
+        suggestions.push(makeColumnItem(col, CIK, range, sortPrefix))
+      }
+    }
+  }
+}
+
+function addTableItems(
+  suggestions: Monaco.languages.CompletionItem[],
+  schema: SchemaDatabase[],
+  CIK: typeof Monaco.languages.CompletionItemKind,
+  range: Monaco.IRange,
+  sortPrefix: string,
+) {
+  for (const db of schema) {
+    if (isSystemDatabase(db.name)) continue
+    suggestions.push({
+      label: db.name,
+      kind: CIK.Module,
+      detail: 'database',
+      insertText: db.name,
+      filterText: db.name.toLowerCase(),
+      sortText: `${sortPrefix}0_${db.name.toLowerCase()}`,
+      range,
+    })
+    for (const table of db.tables) {
+      suggestions.push({
+        label: table.name,
+        kind: CIK.Struct,
+        detail: `${db.name}.${table.name}`,
+        insertText: table.name,
+        filterText: table.name.toLowerCase(),
+        sortText: `${sortPrefix}1_${table.name.toLowerCase()}`,
+        range,
+      })
+      suggestions.push({
+        label: `${db.name}.${table.name}`,
+        kind: CIK.Struct,
+        detail: db.name,
+        insertText: `${db.name}.${table.name}`,
+        filterText: `${db.name}.${table.name}`.toLowerCase(),
+        sortText: `${sortPrefix}2_${db.name}.${table.name}`.toLowerCase(),
+        range,
+      })
+    }
   }
 }
 
@@ -312,13 +484,7 @@ export function provideCompletionItems(
       const table = db.tables.find((t) => t.name.toLowerCase() === context.table.toLowerCase())
       if (table) {
         for (const col of table.columns) {
-          suggestions.push({
-            label: col.name,
-            kind: CIK.Field,
-            detail: col.type,
-            insertText: col.name,
-            range,
-          })
+          suggestions.push(makeColumnItem(col, CIK, range, '0_'))
         }
       }
     }
@@ -326,7 +492,7 @@ export function provideCompletionItems(
   }
 
   if (context.kind === 'dot-database') {
-    // database. → show tables (and columns if it's a table name)
+    // database. → show tables OR table. → show columns
     const db = schema.find((d) => d.name.toLowerCase() === context.database.toLowerCase())
     if (db) {
       for (const table of db.tables) {
@@ -335,6 +501,8 @@ export function provideCompletionItems(
           kind: CIK.Struct,
           detail: `${db.name}.${table.name}`,
           insertText: table.name,
+          filterText: table.name.toLowerCase(),
+          sortText: `0_${table.name.toLowerCase()}`,
           range,
         })
       }
@@ -346,94 +514,99 @@ export function provideCompletionItems(
       for (const table of d.tables) {
         if (table.name.toLowerCase() === context.database.toLowerCase()) {
           for (const col of table.columns) {
-            suggestions.push({
-              label: col.name,
-              kind: CIK.Field,
-              detail: col.type,
-              insertText: col.name,
-              range,
-            })
+            suggestions.push(makeColumnItem(col, CIK, range, '0_'))
           }
         }
       }
     }
-    if (suggestions.length > 0) return { suggestions }
-
     return { suggestions }
   }
 
   if (context.kind === 'after-from-join') {
-    // After FROM/JOIN → show database.table and just table names
-    for (const db of schema) {
-      suggestions.push({
-        label: db.name,
-        kind: CIK.Module,
-        detail: 'database',
-        insertText: db.name,
-        range,
-      })
-      for (const table of db.tables) {
-        suggestions.push({
-          label: table.name,
-          kind: CIK.Struct,
-          detail: `${db.name}.${table.name}`,
-          insertText: table.name,
-          range,
-        })
-        suggestions.push({
-          label: `${db.name}.${table.name}`,
-          kind: CIK.Struct,
-          detail: db.name,
-          insertText: `${db.name}.${table.name}`,
-          range,
-        })
-      }
+    // After FROM/JOIN → show ONLY databases and tables (no keywords, no functions)
+    addTableItems(suggestions, schema, CIK, range, '0_')
+    return { suggestions }
+  }
+
+  if (context.kind === 'after-select') {
+    // After SELECT → columns (from FROM table if known), functions, *
+    const textBefore = getTextBeforeCursor(model, position)
+    suggestions.push({
+      label: '*',
+      kind: CIK.Operator,
+      insertText: '*',
+      sortText: '0_',
+      range,
+    })
+    addColumnsFromContext(suggestions, schema, textBefore, CIK, range, '1_')
+    for (const fn of CH_FUNCTIONS) {
+      suggestions.push(makeFunctionItem(fn, CIK, range, '2_'))
     }
     return { suggestions }
   }
 
-  // General context — show everything
-  // Databases
+  if (context.kind === 'after-where') {
+    // After WHERE/AND/OR → columns from FROM table
+    const textBefore = getTextBeforeCursor(model, position)
+    addColumnsFromContext(suggestions, schema, textBefore, CIK, range, '0_')
+    for (const fn of CH_FUNCTIONS) {
+      suggestions.push(makeFunctionItem(fn, CIK, range, '1_'))
+    }
+    return { suggestions }
+  }
+
+  if (context.kind === 'after-group-order') {
+    // After GROUP BY / ORDER BY → columns from FROM table
+    const textBefore = getTextBeforeCursor(model, position)
+    addColumnsFromContext(suggestions, schema, textBefore, CIK, range, '0_')
+    return { suggestions }
+  }
+
+  if (context.kind === 'keyword') {
+    // Line start or after whitespace — prioritize keywords
+    for (const kw of CH_KEYWORDS) {
+      suggestions.push(makeKeywordItem(kw, CIK, range, '0_'))
+    }
+    // Also show tables and functions at lower priority
+    addTableItems(suggestions, schema, CIK, range, '2_')
+    for (const fn of CH_FUNCTIONS) {
+      suggestions.push(makeFunctionItem(fn, CIK, range, '1_'))
+    }
+    return { suggestions }
+  }
+
+  // General context — keywords first, then tables, then functions
+  for (const kw of CH_KEYWORDS) {
+    suggestions.push(makeKeywordItem(kw, CIK, range, '0_'))
+  }
+
+  // Non-system databases and tables
   for (const db of schema) {
+    if (isSystemDatabase(db.name)) continue
     suggestions.push({
       label: db.name,
       kind: CIK.Module,
       detail: 'database',
       insertText: db.name,
+      filterText: db.name.toLowerCase(),
+      sortText: `1_${db.name.toLowerCase()}`,
       range,
     })
-
-    // Tables (unqualified)
     for (const table of db.tables) {
       suggestions.push({
         label: table.name,
         kind: CIK.Struct,
         detail: `${db.name}.${table.name}`,
         insertText: table.name,
+        filterText: table.name.toLowerCase(),
+        sortText: `1_${table.name.toLowerCase()}`,
         range,
       })
     }
   }
 
-  // ClickHouse keywords
-  for (const kw of CH_KEYWORDS) {
-    suggestions.push({
-      label: kw,
-      kind: CIK.Keyword,
-      insertText: kw,
-      range,
-    })
-  }
-
-  // ClickHouse functions
   for (const fn of CH_FUNCTIONS) {
-    suggestions.push({
-      label: fn,
-      kind: CIK.Function,
-      detail: 'function',
-      insertText: fn,
-      range,
-    })
+    suggestions.push(makeFunctionItem(fn, CIK, range, '2_'))
   }
 
   return { suggestions }

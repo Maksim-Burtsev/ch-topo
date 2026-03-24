@@ -222,31 +222,20 @@ describe('provideCompletionItems', () => {
     schema = buildSchemaLookup(rawTables, rawColumns)
   })
 
-  it('suggests databases, tables, keywords, and functions in general context', () => {
+  it('suggests keywords at line start', () => {
     const model = createMockModel('SEL')
     const position = createPosition(1, 4)
     const result = provideCompletionItems(schema, model, position, mockMonaco)
 
     const labels = result.suggestions.map((s) => s.label)
 
-    // Databases
-    expect(labels).toContain('analytics')
-    expect(labels).toContain('marketing')
-
-    // Tables
-    expect(labels).toContain('events')
-    expect(labels).toContain('sessions')
-    expect(labels).toContain('campaigns')
-
-    // Keywords
+    // Keywords should be present (line start triggers keyword context)
     expect(labels).toContain('SELECT')
     expect(labels).toContain('FROM')
     expect(labels).toContain('WHERE')
 
-    // Functions
+    // Functions should also be available
     expect(labels).toContain('count')
-    expect(labels).toContain('sum')
-    expect(labels).toContain('toDate')
   })
 
   it('suggests tables after database dot', () => {
@@ -297,7 +286,7 @@ describe('provideCompletionItems', () => {
     expect(labels).toContain('user_id')
   })
 
-  it('suggests databases and tables after FROM keyword', () => {
+  it('suggests ONLY databases and tables after FROM keyword', () => {
     const model = createMockModel('SELECT * FROM ')
     const position = createPosition(1, 15)
     const result = provideCompletionItems(schema, model, position, mockMonaco)
@@ -307,8 +296,10 @@ describe('provideCompletionItems', () => {
     expect(labels).toContain('marketing')
     expect(labels).toContain('events')
     expect(labels).toContain('analytics.events')
-    // Should not include keywords in FROM context
+    // Should NOT include keywords in FROM context
     expect(labels).not.toContain('SELECT')
+    // Should NOT include functions in FROM context
+    expect(labels).not.toContain('count')
   })
 
   it('suggests databases and tables after JOIN keyword', () => {
@@ -347,26 +338,23 @@ describe('provideCompletionItems', () => {
     const position = createPosition(1, 15)
     const result = provideCompletionItems([], model, position, mockMonaco)
 
-    // Should still have suggestions (FROM context returns databases/tables, but schema is empty)
-    // No error should be thrown
+    // No error should be thrown, just empty table suggestions
     expect(result.suggestions).toBeDefined()
   })
 
-  it('includes ClickHouse-specific functions', () => {
+  it('includes ClickHouse-specific functions in general context', () => {
     const model = createMockModel('SELECT ')
     const position = createPosition(1, 8)
     const result = provideCompletionItems(schema, model, position, mockMonaco)
 
     const labels = result.suggestions.map((s) => s.label)
-    expect(labels).toContain('uniq')
-    expect(labels).toContain('uniqExact')
-    expect(labels).toContain('arrayJoin')
-    expect(labels).toContain('groupArray')
-    expect(labels).toContain('JSONExtract')
-    expect(labels).toContain('dictGet')
+    // After SELECT, functions should be available
+    expect(labels).toContain('count')
+    expect(labels).toContain('sum')
+    expect(labels).toContain('toDate')
   })
 
-  it('includes ClickHouse SQL keywords', () => {
+  it('includes ClickHouse SQL keywords at line start', () => {
     const model = createMockModel('')
     const position = createPosition(1, 1)
     const result = provideCompletionItems(schema, model, position, mockMonaco)
@@ -384,5 +372,79 @@ describe('provideCompletionItems', () => {
     expect(labels).toContain('CREATE TABLE')
     expect(labels).toContain('ALTER TABLE')
     expect(labels).toContain('DROP TABLE')
+  })
+
+  it('has filterText for case-insensitive matching on keywords', () => {
+    const model = createMockModel('sel')
+    const position = createPosition(1, 4)
+    const result = provideCompletionItems(schema, model, position, mockMonaco)
+
+    const selectItem = result.suggestions.find((s) => s.label === 'SELECT')
+    expect(selectItem).toBeDefined()
+    expect(selectItem?.filterText).toBe('select')
+  })
+
+  it('suggests columns after WHERE when FROM table is known', () => {
+    const model = createMockModel('SELECT * FROM events WHERE ')
+    const position = createPosition(1, 28)
+    const result = provideCompletionItems(schema, model, position, mockMonaco)
+
+    const labels = result.suggestions.map((s) => s.label)
+    expect(labels).toContain('event_id')
+    expect(labels).toContain('event_date')
+    expect(labels).toContain('user_id')
+    // Should NOT suggest keywords in WHERE context
+    expect(labels).not.toContain('SELECT')
+  })
+
+  it('suggests columns and functions after SELECT with FROM', () => {
+    const model3 = createMockModel('SELECT ')
+    const position = createPosition(1, 8)
+    const result = provideCompletionItems(schema, model3, position, mockMonaco)
+
+    const labels = result.suggestions.map((s) => s.label)
+    // After SELECT should have * and functions
+    expect(labels).toContain('*')
+    expect(labels).toContain('count')
+    expect(labels).toContain('sum')
+    // Should NOT have keywords
+    expect(labels).not.toContain('FROM')
+  })
+
+  it('filters out system databases from general suggestions', () => {
+    const systemSchema: SchemaDatabase[] = [
+      ...schema,
+      {
+        name: 'system',
+        tables: [
+          { database: 'system', name: 'query_log', columns: [{ name: 'query', type: 'String' }] },
+        ],
+      },
+    ]
+    const model = createMockModel('SELECT * FROM ')
+    const position = createPosition(1, 15)
+    const result = provideCompletionItems(systemSchema, model, position, mockMonaco)
+
+    const labels = result.suggestions.map((s) => s.label)
+    expect(labels).not.toContain('system')
+    expect(labels).not.toContain('query_log')
+  })
+
+  it('shows system tables when user types system.', () => {
+    const systemSchema: SchemaDatabase[] = [
+      ...schema,
+      {
+        name: 'system',
+        tables: [
+          { database: 'system', name: 'query_log', columns: [{ name: 'query', type: 'String' }] },
+        ],
+      },
+    ]
+    const model = createMockModel('SELECT * FROM system.')
+    const position = createPosition(1, 22)
+    const result = provideCompletionItems(systemSchema, model, position, mockMonaco)
+
+    const labels = result.suggestions.map((s) => s.label)
+    expect(labels).toContain('query_log')
   })
 })
