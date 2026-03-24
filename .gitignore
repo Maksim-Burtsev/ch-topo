@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# ralphex progress logs
+.ralphex/progress/
+
+# ralphex progress logs
+.ralphex/worktrees/
