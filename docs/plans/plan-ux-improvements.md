@@ -22,12 +22,12 @@
 - [x] Quick clear: "Reset filters" link when any filter is active
 
 ### Task 3: Database grouping on Schema graph page
-- [ ] When multiple databases exist: group nodes visually by database
-- [ ] Option A (preferred): dashed container rect per database with database name label, nodes inside
-- [ ] Each container has a subtle background tint or border to distinguish databases
-- [ ] If only one database — no container, render as before
-- [ ] Database filter dropdown on graph page (same as Tables page) to show only one database at a time
-- [ ] "All databases" shows everything with grouping
+- [x] When multiple databases exist: group nodes visually by database
+- [x] Option A (preferred): dashed container rect per database with database name label, nodes inside
+- [x] Each container has a subtle background tint or border to distinguish databases
+- [x] If only one database — no container, render as before
+- [x] Database filter dropdown on graph page (same as Tables page) to show only one database at a time
+- [x] "All databases" shows everything with grouping
 
 ### Task 4: Graph layout with database groups
 - [ ] Adjust React Flow layout (dagre or custom) to respect database grouping

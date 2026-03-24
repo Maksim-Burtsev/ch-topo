@@ -113,12 +113,51 @@ function UnlinkedHeaderNode({ data }: { data: Record<string, unknown> }) {
   )
 }
 
-const nodeTypes = { schema: SchemaNode, 'unlinked-header': UnlinkedHeaderNode }
+function DatabaseGroupNode({ data }: { data: Record<string, unknown> }) {
+  const label = data.label as string
+  const width = data.width as number
+  const height = data.height as number
+  const color = data.color as string
+  const bgColor = data.bgColor as string
+
+  return (
+    <div
+      style={{
+        width,
+        height,
+        border: `2px dashed ${color}`,
+        backgroundColor: bgColor,
+        borderRadius: 12,
+      }}
+    >
+      <div className="px-3 pt-2 text-[11px] font-semibold" style={{ color }}>
+        {label}
+      </div>
+    </div>
+  )
+}
+
+const nodeTypes = {
+  schema: SchemaNode,
+  'unlinked-header': UnlinkedHeaderNode,
+  'database-group': DatabaseGroupNode,
+}
 
 const NODE_WIDTH = 180
 const NODE_HEIGHT = 70
 const MIN_NODE_HEIGHT = 60
 const MAX_NODE_HEIGHT = 100
+
+const DB_GROUP_PALETTE = [
+  { border: '#3b82f6', bg: 'rgba(59, 130, 246, 0.04)' },
+  { border: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.04)' },
+  { border: '#14b8a6', bg: 'rgba(20, 184, 166, 0.04)' },
+  { border: '#f97316', bg: 'rgba(249, 115, 22, 0.04)' },
+  { border: '#ec4899', bg: 'rgba(236, 72, 153, 0.04)' },
+]
+
+const GROUP_PADDING = 24
+const GROUP_HEADER_H = 28
 
 function getNodeType(
   table: RawTableRow,
@@ -353,7 +392,32 @@ function buildGraphData(
   }
 
   const layout = layoutWithDagre(nodes, edges)
-  return { layout, edges }
+
+  // Compute database bounding boxes from connected nodes
+  const dbBounds: Record<string, { minX: number; minY: number; maxX: number; maxY: number }> = {}
+  for (const node of layout.connected) {
+    const db = node.id.startsWith('dict_')
+      ? (node.id.slice(5).split('.')[0] ?? '')
+      : (node.id.split('.')[0] ?? '')
+    if (!db) continue
+    const h = (node.data as { height?: number }).height ?? NODE_HEIGHT
+    const existing = dbBounds[db]
+    if (existing) {
+      existing.minX = Math.min(existing.minX, node.position.x)
+      existing.minY = Math.min(existing.minY, node.position.y)
+      existing.maxX = Math.max(existing.maxX, node.position.x + NODE_WIDTH)
+      existing.maxY = Math.max(existing.maxY, node.position.y + h)
+    } else {
+      dbBounds[db] = {
+        minX: node.position.x,
+        minY: node.position.y,
+        maxX: node.position.x + NODE_WIDTH,
+        maxY: node.position.y + h,
+      }
+    }
+  }
+
+  return { layout, edges, dbBounds }
 }
 
 function getConnectedIds(nodeId: string, edges: Edge[]): Set<string> {
@@ -423,7 +487,42 @@ function GraphPageInner() {
     [tables, dictionaries, graph, databaseFilter],
   )
 
-  // Build the final node list: connected + header + isolated (if expanded)
+  // Database group nodes (dashed containers behind regular nodes)
+  const groupNodes = useMemo((): Node[] => {
+    if (databases.length <= 1 || databaseFilter) return []
+    const { dbBounds } = computed
+    const dbNames = Object.keys(dbBounds).sort()
+    if (dbNames.length <= 1) return []
+
+    return dbNames.flatMap((db, i): Node[] => {
+      const bounds = dbBounds[db]
+      const palette = DB_GROUP_PALETTE[i % DB_GROUP_PALETTE.length]
+      if (!bounds || !palette) return []
+      return [{
+        id: `__db_group_${db}__`,
+        type: 'database-group',
+        position: {
+          x: bounds.minX - GROUP_PADDING,
+          y: bounds.minY - GROUP_PADDING - GROUP_HEADER_H,
+        },
+        selectable: false,
+        draggable: false,
+        connectable: false,
+        focusable: false,
+        zIndex: -1,
+        style: { pointerEvents: 'none' },
+        data: {
+          label: db,
+          width: bounds.maxX - bounds.minX + GROUP_PADDING * 2,
+          height: bounds.maxY - bounds.minY + GROUP_PADDING * 2 + GROUP_HEADER_H,
+          color: palette.border,
+          bgColor: palette.bg,
+        },
+      }]
+    })
+  }, [computed, databases.length, databaseFilter])
+
+  // Build the final node list: groups + connected + header + isolated (if expanded)
   const allNodes = useMemo(() => {
     const { layout } = computed
     const hasConnected = layout.connected.length > 0
@@ -431,10 +530,10 @@ function GraphPageInner() {
 
     // All isolated, no connected: just show grid, no header
     if (!hasConnected && hasIsolated) return layout.isolated
-    // No isolated: just connected
-    if (!hasIsolated) return layout.connected
+    // No isolated: just connected (with optional group backgrounds)
+    if (!hasIsolated) return [...groupNodes, ...layout.connected]
 
-    // Both: connected + header + optionally isolated
+    // Both: groups + connected + header + optionally isolated
     const headerNode: Node = {
       id: '__unlinked_header__',
       type: 'unlinked-header',
@@ -451,10 +550,10 @@ function GraphPageInner() {
     }
 
     if (unlinkedCollapsed) {
-      return [...layout.connected, headerNode]
+      return [...groupNodes, ...layout.connected, headerNode]
     }
-    return [...layout.connected, headerNode, ...layout.isolated]
-  }, [computed, unlinkedCollapsed, toggleUnlinkedCollapsed])
+    return [...groupNodes, ...layout.connected, headerNode, ...layout.isolated]
+  }, [computed, groupNodes, unlinkedCollapsed, toggleUnlinkedCollapsed])
 
   const allComputedNodes = useMemo(() => {
     const { layout } = computed
@@ -499,7 +598,7 @@ function GraphPageInner() {
     if (!highlightedIds) {
       setNodes((nds) =>
         nds.map((n) =>
-          n.type === 'unlinked-header'
+          n.type === 'unlinked-header' || n.type === 'database-group'
             ? n
             : { ...n, className: '', data: { ...n.data, selected: false } },
         ),
@@ -510,7 +609,7 @@ function GraphPageInner() {
 
     setNodes((nds) =>
       nds.map((n) =>
-        n.type === 'unlinked-header'
+        n.type === 'unlinked-header' || n.type === 'database-group'
           ? n
           : {
               ...n,
@@ -531,7 +630,7 @@ function GraphPageInner() {
   }, [highlightedIds, selectedNodeId, setNodes, setEdges])
 
   const onNodeClick: NodeMouseHandler = useCallback((_event, node) => {
-    if (node.type === 'unlinked-header') return
+    if (node.type === 'unlinked-header' || node.type === 'database-group') return
     const tableId = node.id.startsWith('dict_') ? node.id.slice(5) : node.id
     setSelectedId(tableId)
   }, [])
@@ -635,6 +734,8 @@ function GraphPageInner() {
           {showMinimap && (
             <MiniMap
               nodeColor={(node) => {
+                if (node.type === 'database-group' || node.type === 'unlinked-header')
+                  return 'rgba(0,0,0,0)'
                 const nt = (node.data as { nodeType: string }).nodeType
                 if (nt === 'mv') return '#a855f7'
                 if (nt === 'target') return '#f87171'
