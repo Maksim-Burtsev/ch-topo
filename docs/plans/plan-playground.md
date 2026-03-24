@@ -56,12 +56,12 @@
 - [x] Collapsible rows for large results
 
 ### Task 6: Query stats bar
-- [ ] Create `src/components/playground/query-stats.tsx`
-- [ ] Shown between editor and results after execution
-- [ ] Display: elapsed time, rows read, bytes read, rows returned
-- [ ] Format bytes human-readable (KB, MB, GB)
-- [ ] Error state: red background with error message and line number highlighted in editor
-- [ ] Running state: spinner + "Executing..." + cancel button
+- [x] Create `src/components/playground/query-stats.tsx`
+- [x] Shown between editor and results after execution
+- [x] Display: elapsed time, rows read, bytes read, rows returned
+- [x] Format bytes human-readable (KB, MB, GB)
+- [x] Error state: red background with error message and line number highlighted in editor
+- [x] Running state: spinner + "Executing..." + cancel button
 
 ### Task 7: Query history
 - [ ] Create `src/lib/playground/history.ts`
