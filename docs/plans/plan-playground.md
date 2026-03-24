@@ -64,16 +64,16 @@
 - [x] Running state: spinner + "Executing..." + cancel button
 
 ### Task 7: Query history
-- [ ] Create `src/lib/playground/history.ts`
-- [ ] Store in localStorage: last 100 queries
-- [ ] Each entry: sql, timestamp, elapsed, rowsReturned, error (boolean)
-- [ ] Functions: addToHistory(), getHistory(), clearHistory()
-- [ ] Create `src/components/playground/query-history.tsx`
-- [ ] Sidebar panel or dropdown showing history
-- [ ] Each item: first line of SQL (truncated), timestamp, elapsed badge, error badge if failed
-- [ ] Click → load SQL into editor
-- [ ] Clear history button
-- [ ] Search/filter within history
+- [x] Create `src/lib/playground/history.ts`
+- [x] Store in localStorage: last 100 queries
+- [x] Each entry: sql, timestamp, elapsed, rowsReturned, error (boolean)
+- [x] Functions: addToHistory(), getHistory(), clearHistory()
+- [x] Create `src/components/playground/query-history.tsx`
+- [x] Sidebar panel or dropdown showing history
+- [x] Each item: first line of SQL (truncated), timestamp, elapsed badge, error badge if failed
+- [x] Click → load SQL into editor
+- [x] Clear history button
+- [x] Search/filter within history
 
 ### Task 8: EXPLAIN support
 - [ ] Create `src/lib/playground/explain.ts`
