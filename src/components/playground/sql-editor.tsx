@@ -1,5 +1,11 @@
 import Editor, { type OnMount } from '@monaco-editor/react'
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
+import {
+  buildSchemaLookup,
+  registerSqlCompletionProvider,
+  type SchemaDatabase,
+} from '@/lib/playground/autocomplete'
+import { useSchemaStore } from '@/stores/schema-store'
 import { useThemeStore } from '@/stores/theme-store'
 
 interface SqlEditorProps {
@@ -11,10 +17,33 @@ interface SqlEditorProps {
 export function SqlEditor({ value, onChange, className }: SqlEditorProps) {
   const theme = useThemeStore((s) => s.theme)
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null)
+  const schemaRef = useRef<SchemaDatabase[]>([])
+  const disposableRef = useRef<{ dispose: () => void } | null>(null)
 
-  const handleMount: OnMount = useCallback((editor) => {
+  const tables = useSchemaStore((s) => s.tables)
+  const columns = useSchemaStore((s) => s.columns)
+  const columnsReady = useSchemaStore((s) => s.columnsReady)
+
+  useEffect(() => {
+    if (columnsReady) {
+      schemaRef.current = buildSchemaLookup(tables, columns)
+    }
+  }, [tables, columns, columnsReady])
+
+  const handleMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor
     editor.focus()
+
+    disposableRef.current = registerSqlCompletionProvider(
+      monaco as Parameters<typeof registerSqlCompletionProvider>[0],
+      () => schemaRef.current,
+    )
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      disposableRef.current?.dispose()
+    }
   }, [])
 
   const handleChange = useCallback(

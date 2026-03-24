@@ -16,16 +16,16 @@
 - [x] Expose value and onChange props
 
 ### Task 2: SQL autocomplete from schema
-- [ ] Create `src/lib/playground/autocomplete.ts`
-- [ ] Register Monaco completion provider for SQL
-- [ ] Completions sourced from schema store:
+- [x] Create `src/lib/playground/autocomplete.ts`
+- [x] Register Monaco completion provider for SQL
+- [x] Completions sourced from schema store:
   - Database names
   - Table names (qualified: `database.table` and unqualified)
   - Column names (when cursor is after a table name or alias)
   - ClickHouse functions: top 50 most common (count, sum, avg, uniq, uniqExact, toDate, toDateTime, toString, arrayJoin, groupArray, etc)
   - ClickHouse keywords: SELECT, FROM, WHERE, GROUP BY, ORDER BY, LIMIT, JOIN, ON, USING, AS, WITH, HAVING, UNION ALL, INSERT INTO, CREATE TABLE, ALTER TABLE, DROP TABLE
-- [ ] Show column type in autocomplete detail
-- [ ] Trigger on dot (database.table.column) and on space after FROM/JOIN
+- [x] Show column type in autocomplete detail
+- [x] Trigger on dot (database.table.column) and on space after FROM/JOIN
 
 ### Task 3: Query execution engine
 - [ ] Create `src/lib/playground/execute.ts`
