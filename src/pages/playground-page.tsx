@@ -1,11 +1,11 @@
-import { ChevronDown, Clock, Eraser, Play, Search, TableProperties, Braces } from 'lucide-react'
+import { Clock, Eraser, Play, TableProperties, Braces } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ExplainView } from '@/components/playground/explain-view'
 import { QueryHistory } from '@/components/playground/query-history'
 import { QueryStats, type QueryState } from '@/components/playground/query-stats'
 import { ResultsJson } from '@/components/playground/results-json'
 import { ResultsTable } from '@/components/playground/results-table'
-import { SqlEditor } from '@/components/playground/sql-editor'
+import { SqlEditor, type SqlEditorHandle } from '@/components/playground/sql-editor'
 import { executeQuery, type QueryResult } from '@/lib/playground/execute'
 import { explainQuery, type ExplainMode, type ExplainResult } from '@/lib/playground/explain'
 import { addToHistory } from '@/lib/playground/history'
@@ -21,10 +21,47 @@ const MAX_EDITOR_PCT = 85
 
 // ── Helpers ────────────────────────────────────────────────────
 
-function extractFirstStatement(sql: string): string {
-  const trimmed = sql.trim()
-  const idx = trimmed.indexOf(';')
-  return idx >= 0 ? trimmed.slice(0, idx).trim() : trimmed
+/**
+ * Given full SQL text and a cursor offset, find the statement the cursor is in.
+ * Statements are separated by `;`. Returns the trimmed statement.
+ */
+function extractStatementAtCursor(sql: string, cursorOffset: number): string {
+  // Split by semicolons, tracking char ranges
+  let start = 0
+  const segments: { text: string; start: number; end: number }[] = []
+  const parts = sql.split(';')
+  for (const part of parts) {
+    const end = start + part.length
+    segments.push({ text: part, start, end })
+    start = end + 1 // +1 for the semicolon
+  }
+
+  // Find which segment contains the cursor
+  const offset = Math.min(cursorOffset, sql.length)
+  for (const seg of segments) {
+    if (offset <= seg.end) {
+      const trimmed = seg.text.trim()
+      if (trimmed) return trimmed
+      break
+    }
+  }
+
+  // Fallback: find last non-empty segment before cursor
+  for (let i = segments.length - 1; i >= 0; i--) {
+    const seg = segments[i]
+    if (seg && offset >= seg.start) {
+      const trimmed = seg.text.trim()
+      if (trimmed) return trimmed
+    }
+  }
+
+  // Last resort: first non-empty statement
+  for (const seg of segments) {
+    const trimmed = seg.text.trim()
+    if (trimmed) return trimmed
+  }
+
+  return sql.trim()
 }
 
 function isMac(): boolean {
@@ -39,6 +76,8 @@ export function PlaygroundPage() {
   const format = usePlaygroundStore((s) => s.format)
   const setFormat = usePlaygroundStore((s) => s.setFormat)
   const toggleFormat = usePlaygroundStore((s) => s.toggleFormat)
+  const editorPct = usePlaygroundStore((s) => s.editorPct)
+  const setEditorPct = usePlaygroundStore((s) => s.setEditorPct)
   const getParams = useConnectionStore((s) => s.getParams)
 
   const [queryState, setQueryState] = useState<QueryState>({ status: 'idle' })
@@ -46,31 +85,34 @@ export function PlaygroundPage() {
   const [cappedMessage, setCappedMessage] = useState<string | null>(null)
   const [explainResult, setExplainResult] = useState<ExplainResult | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const [editorPct, setEditorPct] = useState(40)
-  const [explainDropdownOpen, setExplainDropdownOpen] = useState(false)
 
   const abortRef = useRef<AbortController | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const explainDropdownRef = useRef<HTMLDivElement>(null)
+  const editorRef = useRef<SqlEditorHandle>(null)
 
-  // Close explain dropdown on outside click
-  useEffect(() => {
-    if (!explainDropdownOpen) return
-    function handleClick(e: MouseEvent) {
-      if (explainDropdownRef.current && !explainDropdownRef.current.contains(e.target as Node)) {
-        setExplainDropdownOpen(false)
-      }
+  // ── Get active statement ─────────────────────────────────────
+
+  const getActiveStatement = useCallback((): string => {
+    const editor = editorRef.current
+    if (!editor) {
+      // Fallback: first statement
+      const idx = sql.indexOf(';')
+      return (idx >= 0 ? sql.slice(0, idx) : sql).trim()
     }
-    document.addEventListener('mousedown', handleClick)
-    return () => {
-      document.removeEventListener('mousedown', handleClick)
-    }
-  }, [explainDropdownOpen])
+
+    // If there's a selection, use it
+    const selection = editor.getSelection()
+    if (selection) return selection.trim()
+
+    // Otherwise find statement at cursor
+    const offset = editor.getCursorOffset()
+    return extractStatementAtCursor(sql, offset)
+  }, [sql])
 
   // ── Execute ────────────────────────────────────────────────
 
   const handleExecute = useCallback(() => {
-    const stmt = extractFirstStatement(sql)
+    const stmt = getActiveStatement()
     if (!stmt) return
 
     abortRef.current?.abort()
@@ -116,13 +158,13 @@ export function PlaygroundPage() {
         // should not happen — executeQuery catches all errors
       },
     )
-  }, [sql, getParams])
+  }, [getActiveStatement, getParams])
 
   // ── Explain ────────────────────────────────────────────────
 
   const handleExplain = useCallback(
     (mode: ExplainMode) => {
-      const stmt = extractFirstStatement(sql)
+      const stmt = getActiveStatement()
       if (!stmt) return
 
       abortRef.current?.abort()
@@ -161,7 +203,7 @@ export function PlaygroundPage() {
         () => {},
       )
     },
-    [sql, getParams],
+    [getActiveStatement, getParams],
   )
 
   const handleExplainModeChange = useCallback(
@@ -261,7 +303,7 @@ export function PlaygroundPage() {
       document.addEventListener('mousemove', onMove)
       document.addEventListener('mouseup', onUp)
     },
-    [editorPct],
+    [editorPct, setEditorPct],
   )
 
   // ── Render helpers ─────────────────────────────────────────
@@ -274,23 +316,18 @@ export function PlaygroundPage() {
     <div ref={containerRef} className="flex h-full flex-col overflow-hidden -m-6">
       {/* Editor area */}
       <div style={{ height: `${editorPct}%` }} className="flex flex-col min-h-0">
-        <SqlEditor value={sql} onChange={setSql} className="flex-1 min-h-0" />
+        <SqlEditor ref={editorRef} value={sql} onChange={setSql} className="flex-1 min-h-0" />
       </div>
 
-      {/* Toolbar + drag handle */}
-      <div className="flex items-center gap-1.5 border-y border-border bg-card px-3 py-1.5 select-none">
-        {/* Drag handle */}
-        <div
-          className="mr-1 flex h-5 w-6 cursor-row-resize items-center justify-center rounded hover:bg-secondary"
-          onMouseDown={handleDragStart}
-          title="Drag to resize"
-        >
-          <div className="flex flex-col gap-[2px]">
-            <div className="h-[1.5px] w-3 rounded-full bg-muted-foreground/40" />
-            <div className="h-[1.5px] w-3 rounded-full bg-muted-foreground/40" />
-          </div>
-        </div>
+      {/* Drag resize divider */}
+      <div
+        className="h-1.5 cursor-row-resize bg-border/50 hover:bg-primary/30 transition-colors shrink-0"
+        onMouseDown={handleDragStart}
+        title="Drag to resize"
+      />
 
+      {/* Toolbar */}
+      <div className="flex items-center gap-1.5 border-b border-border bg-card px-3 py-1.5 select-none">
         {/* Execute */}
         <button
           type="button"
@@ -302,40 +339,6 @@ export function PlaygroundPage() {
           <Play className="h-3 w-3" />
           Execute
         </button>
-
-        {/* Explain dropdown */}
-        <div ref={explainDropdownRef} className="relative">
-          <button
-            type="button"
-            onClick={() => {
-              setExplainDropdownOpen((v) => !v)
-            }}
-            disabled={isRunning || !sql.trim()}
-            title={`Explain (${modKey}+Shift+Enter)`}
-            className="inline-flex items-center gap-1 rounded-md bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:opacity-50"
-          >
-            <Search className="h-3 w-3" />
-            Explain
-            <ChevronDown className="h-3 w-3" />
-          </button>
-          {explainDropdownOpen && (
-            <div className="absolute left-0 top-full z-50 mt-1 min-w-[120px] rounded-md border border-border bg-popover py-1 shadow-md">
-              {(['plan', 'pipeline', 'syntax'] as ExplainMode[]).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => {
-                    setExplainDropdownOpen(false)
-                    handleExplain(mode)
-                  }}
-                  className="flex w-full items-center px-3 py-1.5 text-xs text-popover-foreground transition-colors hover:bg-accent"
-                >
-                  {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
 
         <div className="mx-1 h-4 w-px bg-border" />
 
@@ -392,33 +395,37 @@ export function PlaygroundPage() {
           Clear
         </button>
 
-        {/* Format toggle indicator */}
-        <div className="ml-auto" />
-        {format === 'table' ? (
-          <button
-            type="button"
-            onClick={() => {
-              setFormat('json')
-            }}
-            className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
-          >
-            Switch to JSON
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => {
-              setFormat('table')
-            }}
-            className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
-          >
-            Switch to Table
-          </button>
-        )}
+        {/* Shortcut hints */}
+        <div className="ml-auto flex items-center gap-3">
+          <span className="text-[10px] text-muted-foreground/50">
+            {modKey}+Enter run · {modKey}+Shift+Enter explain
+          </span>
+          {format === 'table' ? (
+            <button
+              type="button"
+              onClick={() => {
+                setFormat('json')
+              }}
+              className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+            >
+              Switch to JSON
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setFormat('table')
+              }}
+              className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+            >
+              Switch to Table
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Results area */}
-      <div style={{ height: `${100 - editorPct}%` }} className="flex min-h-0 overflow-hidden">
+      <div style={{ flex: 1 }} className="flex min-h-0 overflow-hidden">
         <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
           {/* Query stats bar */}
           <QueryStats state={queryState} />
