@@ -48,12 +48,12 @@
 - [x] Copy cell value on click
 
 ### Task 5: JSON view component
-- [ ] Create `src/components/playground/results-json.tsx`
-- [ ] Toggle between Table view and JSON view
-- [ ] JSON view: pretty-printed JSON of the result rows
-- [ ] Syntax highlighted (use simple CSS coloring: strings=green, numbers=blue, keys=default, null=muted)
-- [ ] Copy all JSON button
-- [ ] Collapsible rows for large results
+- [x] Create `src/components/playground/results-json.tsx`
+- [x] Toggle between Table view and JSON view
+- [x] JSON view: pretty-printed JSON of the result rows
+- [x] Syntax highlighted (use simple CSS coloring: strings=green, numbers=blue, keys=default, null=muted)
+- [x] Copy all JSON button
+- [x] Collapsible rows for large results
 
 ### Task 6: Query stats bar
 - [ ] Create `src/components/playground/query-stats.tsx`
