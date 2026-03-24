@@ -59,7 +59,7 @@
 - [x] Store selected database in URL hash: `/#/tables?db=analytics` so it's shareable
 
 ### Task 8: Tests and cleanup
-- [ ] Test database filter logic: multiple databases, single database, no tables
-- [ ] Test engine filter: combination with database filter
-- [ ] Test history author display: with user, without user, initial_user fallback
-- [ ] All validation commands pass clean
+- [x] Test database filter logic: multiple databases, single database, no tables
+- [x] Test engine filter: combination with database filter
+- [x] Test history author display: with user, without user, initial_user fallback
+- [x] All validation commands pass clean

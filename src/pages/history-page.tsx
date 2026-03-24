@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { DatabaseFilter } from '@/components/shared/database-filter'
 import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/select'
-import type { RawDDLHistoryRow } from '@/lib/clickhouse/types'
 import { getEffectiveDatabase } from '@/lib/database-utils'
+import { getAuthor, getOperationVariant, parseEventDate } from '@/lib/history-utils'
 import { cn } from '@/lib/utils'
 import { useConnectionStore } from '@/stores/connection-store'
 import { useDatabaseFilterStore } from '@/stores/database-filter-store'
@@ -13,30 +13,6 @@ import { useHistoryStore } from '@/stores/history-store'
 const OPERATION_TYPES = ['Create', 'Alter', 'Drop', 'Rename'] as const
 
 type DatePreset = '' | 'today' | '7d' | '30d' | 'custom'
-
-function getAuthor(entry: RawDDLHistoryRow): string {
-  const user = entry.initial_user || entry.user
-  return user || 'system'
-}
-
-function getOperationVariant(op: string): 'mergetree' | 'replacing' | 'destructive' | 'mv' {
-  switch (op) {
-    case 'Create':
-      return 'mergetree'
-    case 'Alter':
-      return 'replacing'
-    case 'Drop':
-      return 'destructive'
-    case 'Rename':
-      return 'mv'
-    default:
-      return 'mergetree'
-  }
-}
-
-function parseEventDate(eventTime: string): Date {
-  return new Date(eventTime.replace(' ', 'T'))
-}
 
 function startOfDay(d: Date): Date {
   const copy = new Date(d)

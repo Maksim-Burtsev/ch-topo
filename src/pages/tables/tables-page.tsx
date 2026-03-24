@@ -7,6 +7,7 @@ import { getEngineVariant } from '@/components/ui/engine-variant'
 import { Input } from '@/components/ui/input'
 import type { RawTableRow } from '@/lib/clickhouse/types'
 import { getEffectiveDatabase } from '@/lib/database-utils'
+import { filterTables } from '@/lib/table-filter-utils'
 import { cn, formatBytes, formatNumber } from '@/lib/utils'
 import { useDatabaseFilterStore } from '@/stores/database-filter-store'
 import { useSchemaStore } from '@/stores/schema-store'
@@ -99,12 +100,7 @@ export function TablesPage() {
   }
 
   const filtered = useMemo(() => {
-    const result = tables.filter(
-      (t) =>
-        t.name.toLowerCase().includes(filter.toLowerCase()) &&
-        (effectiveDatabaseFilter === '' || t.database === effectiveDatabaseFilter) &&
-        (engineFilters.length === 0 || engineFilters.includes(t.engine)),
-    )
+    const result = filterTables(tables, filter, effectiveDatabaseFilter, engineFilters)
 
     result.sort((a, b) => {
       let cmp = 0
