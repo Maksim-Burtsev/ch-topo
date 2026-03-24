@@ -7,13 +7,13 @@
 - `npm run build`
 
 ### Task 1: Monaco Editor setup
-- [ ] Install `@monaco-editor/react` package
-- [ ] Create `src/components/playground/sql-editor.tsx` — Monaco wrapper component
-- [ ] Configure Monaco for SQL language mode
-- [ ] Theme: auto-detect dark/light from app theme, configure matching Monaco theme
-- [ ] Editor options: minimap off, line numbers on, word wrap on, font size 14px, font family monospace
-- [ ] Resize: editor fills available height (flex: 1)
-- [ ] Expose value and onChange props
+- [x] Install `@monaco-editor/react` package
+- [x] Create `src/components/playground/sql-editor.tsx` — Monaco wrapper component
+- [x] Configure Monaco for SQL language mode
+- [x] Theme: auto-detect dark/light from app theme, configure matching Monaco theme
+- [x] Editor options: minimap off, line numbers on, word wrap on, font size 14px, font family monospace
+- [x] Resize: editor fills available height (flex: 1)
+- [x] Expose value and onChange props
 
 ### Task 2: SQL autocomplete from schema
 - [ ] Create `src/lib/playground/autocomplete.ts`
