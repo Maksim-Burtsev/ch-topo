@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, Search } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpDown, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Badge } from '@/components/ui/badge'
@@ -6,7 +6,7 @@ import { getEngineVariant } from '@/components/ui/engine-variant'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import type { RawTableRow } from '@/lib/clickhouse/types'
-import { formatBytes, formatNumber } from '@/lib/utils'
+import { cn, formatBytes, formatNumber } from '@/lib/utils'
 import { useSchemaStore } from '@/stores/schema-store'
 
 type SortField = 'name' | 'engine' | 'total_rows' | 'total_bytes' | 'compression'
@@ -52,7 +52,7 @@ export function TablesPage() {
 
   const [filter, setFilter] = useState('')
   const [databaseFilter, setDatabaseFilter] = useState('')
-  const [engineFilter, setEngineFilter] = useState('')
+  const [engineFilters, setEngineFilters] = useState<string[]>([])
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -71,12 +71,38 @@ export function TablesPage() {
     return [...set].sort()
   }, [tables])
 
+  const hasActiveFilters = filter !== '' || databaseFilter !== '' || engineFilters.length > 0
+
+  function toggleEngine(engine: string) {
+    setEngineFilters((prev) =>
+      prev.includes(engine) ? prev.filter((e) => e !== engine) : [...prev, engine],
+    )
+  }
+
+  function resetFilters() {
+    setFilter('')
+    setDatabaseFilter('')
+    setEngineFilters([])
+  }
+
+  function getFilterSummary(): string {
+    const parts: string[] = []
+    if (engineFilters.length > 0) {
+      parts.push(`${engineFilters.length} engine${engineFilters.length !== 1 ? 's' : ''}`)
+    }
+    if (databaseFilter !== '') {
+      parts.push('1 database')
+    }
+    if (parts.length === 0) return ''
+    return `Filtered: ${parts.join(', ')}`
+  }
+
   const filtered = useMemo(() => {
     const result = tables.filter(
       (t) =>
         t.name.toLowerCase().includes(filter.toLowerCase()) &&
         (effectiveDatabaseFilter === '' || t.database === effectiveDatabaseFilter) &&
-        (engineFilter === '' || t.engine === engineFilter),
+        (engineFilters.length === 0 || engineFilters.includes(t.engine)),
     )
 
     result.sort((a, b) => {
@@ -102,7 +128,7 @@ export function TablesPage() {
     })
 
     return result
-  }, [tables, filter, effectiveDatabaseFilter, engineFilter, sortField, sortDir])
+  }, [tables, filter, effectiveDatabaseFilter, engineFilters, sortField, sortDir])
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -124,7 +150,7 @@ export function TablesPage() {
       if (e.key === 'Escape' && document.activeElement === inputRef.current) {
         setFilter('')
         setDatabaseFilter('')
-        setEngineFilter('')
+        setEngineFilters([])
         inputRef.current?.blur()
       }
     }
@@ -198,24 +224,52 @@ export function TablesPage() {
             </option>
           ))}
         </Select>
-        <Select
-          value={engineFilter}
-          onChange={(e) => {
-            setEngineFilter(e.target.value)
-          }}
-          className="w-44"
-        >
-          <option value="">All engines</option>
-          {engines.map((e) => (
-            <option key={e} value={e}>
-              {e}
-            </option>
-          ))}
-        </Select>
         <span className="text-xs text-muted-foreground">
           {filtered.length} table{filtered.length !== 1 ? 's' : ''}
         </span>
+        {getFilterSummary() && (
+          <span className="text-xs text-muted-foreground">{getFilterSummary()}</span>
+        )}
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X size={12} />
+            Reset filters
+          </button>
+        )}
       </div>
+      {engines.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-1.5">
+          <span className="text-xs text-muted-foreground mr-1">Engines:</span>
+          {engines.map((engine) => {
+            const isSelected = engineFilters.includes(engine)
+            return (
+              <button
+                key={engine}
+                type="button"
+                onClick={() => {
+                  toggleEngine(engine)
+                }}
+                className="transition-opacity"
+              >
+                <Badge
+                  variant={getEngineVariant(engine)}
+                  className={cn(
+                    'cursor-pointer select-none',
+                    !isSelected && engineFilters.length > 0 && 'opacity-40',
+                  )}
+                >
+                  {engine}
+                  {isSelected && <X size={10} className="ml-1" />}
+                </Badge>
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {tablesReady && tables.length === 0 && (
         <div className="flex flex-col items-center justify-center h-64 rounded-lg border border-border text-center">
@@ -226,7 +280,7 @@ export function TablesPage() {
         </div>
       )}
 
-      {tables.length > 0 && filtered.length === 0 && (filter || databaseFilter || engineFilter) && (
+      {tables.length > 0 && filtered.length === 0 && hasActiveFilters && (
         <div className="flex flex-col items-center justify-center h-64 rounded-lg border border-border text-center">
           <p className="text-sm font-medium text-muted-foreground">No matching tables</p>
           <p className="mt-1 text-xs text-muted-foreground">

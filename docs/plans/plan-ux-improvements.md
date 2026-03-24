@@ -16,10 +16,10 @@
 - [x] If only one database exists — still show the dropdown but pre-selected, so user sees the database name
 
 ### Task 2: Engine type filter on Tables page
-- [ ] Add engine filter dropdown or multi-select chip bar (MergeTree, ReplacingMT, SummingMT, AggregatingMT, MaterializedView, Distributed, Buffer, etc)
-- [ ] Combine with database filter: both active simultaneously
-- [ ] Show active filter count: "Filtered: 2 engines, 1 database"
-- [ ] Quick clear: "Reset filters" link when any filter is active
+- [x] Add engine filter dropdown or multi-select chip bar (MergeTree, ReplacingMT, SummingMT, AggregatingMT, MaterializedView, Distributed, Buffer, etc)
+- [x] Combine with database filter: both active simultaneously
+- [x] Show active filter count: "Filtered: 2 engines, 1 database"
+- [x] Quick clear: "Reset filters" link when any filter is active
 
 ### Task 3: Database grouping on Schema graph page
 - [ ] When multiple databases exist: group nodes visually by database
