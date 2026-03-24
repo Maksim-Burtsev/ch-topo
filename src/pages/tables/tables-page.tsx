@@ -51,10 +51,20 @@ export function TablesPage() {
   const status = useSchemaStore((s) => s.status)
 
   const [filter, setFilter] = useState('')
+  const [databaseFilter, setDatabaseFilter] = useState('')
   const [engineFilter, setEngineFilter] = useState('')
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const databases = useMemo(() => {
+    const set = new Set(tables.map((t) => t.database))
+    return [...set].sort()
+  }, [tables])
+
+  // If only one database, use it even if user hasn't selected one
+  const effectiveDatabaseFilter =
+    databaseFilter === '' && databases.length === 1 ? (databases[0] ?? '') : databaseFilter
 
   const engines = useMemo(() => {
     const set = new Set(tables.map((t) => t.engine))
@@ -65,6 +75,7 @@ export function TablesPage() {
     const result = tables.filter(
       (t) =>
         t.name.toLowerCase().includes(filter.toLowerCase()) &&
+        (effectiveDatabaseFilter === '' || t.database === effectiveDatabaseFilter) &&
         (engineFilter === '' || t.engine === engineFilter),
     )
 
@@ -91,7 +102,7 @@ export function TablesPage() {
     })
 
     return result
-  }, [tables, filter, engineFilter, sortField, sortDir])
+  }, [tables, filter, effectiveDatabaseFilter, engineFilter, sortField, sortDir])
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -112,6 +123,7 @@ export function TablesPage() {
     function handleKey(e: KeyboardEvent) {
       if (e.key === 'Escape' && document.activeElement === inputRef.current) {
         setFilter('')
+        setDatabaseFilter('')
         setEngineFilter('')
         inputRef.current?.blur()
       }
@@ -173,6 +185,20 @@ export function TablesPage() {
           />
         </div>
         <Select
+          value={effectiveDatabaseFilter}
+          onChange={(e) => {
+            setDatabaseFilter(e.target.value)
+          }}
+          className="w-44"
+        >
+          <option value="">All databases</option>
+          {databases.map((db) => (
+            <option key={db} value={db}>
+              {db}
+            </option>
+          ))}
+        </Select>
+        <Select
           value={engineFilter}
           onChange={(e) => {
             setEngineFilter(e.target.value)
@@ -200,7 +226,7 @@ export function TablesPage() {
         </div>
       )}
 
-      {tables.length > 0 && filtered.length === 0 && (filter || engineFilter) && (
+      {tables.length > 0 && filtered.length === 0 && (filter || databaseFilter || engineFilter) && (
         <div className="flex flex-col items-center justify-center h-64 rounded-lg border border-border text-center">
           <p className="text-sm font-medium text-muted-foreground">No matching tables</p>
           <p className="mt-1 text-xs text-muted-foreground">

@@ -7,13 +7,13 @@
 - `npm run build`
 
 ### Task 1: Database filter on Tables page
-- [ ] Extract unique database names from schema store (system.tables → database field)
-- [ ] Add database dropdown filter above the table (before or next to the existing search input)
-- [ ] Options: "All databases" (default) + each database name
-- [ ] Filtering: when database selected, table list shows only tables from that database
-- [ ] Badge next to dropdown showing count: "24 tables" updates on filter change
-- [ ] Engine filter (if already exists) should work in combination with database filter
-- [ ] If only one database exists — still show the dropdown but pre-selected, so user sees the database name
+- [x] Extract unique database names from schema store (system.tables → database field)
+- [x] Add database dropdown filter above the table (before or next to the existing search input)
+- [x] Options: "All databases" (default) + each database name
+- [x] Filtering: when database selected, table list shows only tables from that database
+- [x] Badge next to dropdown showing count: "24 tables" updates on filter change
+- [x] Engine filter (if already exists) should work in combination with database filter
+- [x] If only one database exists — still show the dropdown but pre-selected, so user sees the database name
 
 ### Task 2: Engine type filter on Tables page
 - [ ] Add engine filter dropdown or multi-select chip bar (MergeTree, ReplacingMT, SummingMT, AggregatingMT, MaterializedView, Distributed, Buffer, etc)
