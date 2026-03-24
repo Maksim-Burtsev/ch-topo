@@ -27,6 +27,8 @@ export interface RawDDLHistoryRow {
   query_duration_ms: string
   user: string
   initial_user: string
+  query_kind: string
+  current_database: string
 }
 
 export interface RawColumnRow {

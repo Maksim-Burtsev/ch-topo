@@ -74,11 +74,11 @@ WHERE column <> ''`,
 export function fetchDDLHistory(params: ConnectionParams) {
   return query<RawDDLHistoryRow>(
     params,
-    `SELECT event_time, query, type, exception, query_duration_ms, user, initial_user
+    `SELECT event_time, query, type, exception, query_duration_ms, user, initial_user, query_kind, current_database
 FROM system.query_log
 WHERE query_kind IN ('Create', 'Alter', 'Drop', 'Rename')
   AND type IN ('QueryFinish', 'ExceptionWhileProcessing')
 ORDER BY event_time DESC
-LIMIT 50`,
+LIMIT 200`,
   )
 }

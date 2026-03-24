@@ -44,13 +44,13 @@
 - [x] Add author filter: dropdown to filter history by user (useful when multiple people/bots make DDL changes)
 
 ### Task 6: DDL History — filter improvements
-- [ ] Filter by database (same dropdown component as Tables page, reuse)
-- [ ] Filter by operation type: CREATE / ALTER / DROP / RENAME (multi-select chips)
-- [ ] Filter by status: success / failed
-- [ ] Filter by author (from Task 5)
-- [ ] Date range filter: quick presets (today, 7 days, 30 days) + custom range
-- [ ] All filters work in combination
-- [ ] Show active filter summary: "Showing 12 of 48 changes"
+- [x] Filter by database (same dropdown component as Tables page, reuse)
+- [x] Filter by operation type: CREATE / ALTER / DROP / RENAME (multi-select chips)
+- [x] Filter by status: success / failed
+- [x] Filter by author (from Task 5)
+- [x] Date range filter: quick presets (today, 7 days, 30 days) + custom range
+- [x] All filters work in combination
+- [x] Show active filter summary: "Showing 12 of 48 changes"
 
 ### Task 7: Shared database filter component
 - [ ] Extract database filter into reusable component: `src/components/shared/database-filter.tsx`
