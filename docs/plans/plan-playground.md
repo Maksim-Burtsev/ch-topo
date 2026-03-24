@@ -76,14 +76,14 @@
 - [x] Search/filter within history
 
 ### Task 8: EXPLAIN support
-- [ ] Create `src/lib/playground/explain.ts`
-- [ ] Function `explainQuery(sql: string, client): Promise<ExplainResult>`
-- [ ] Prepend `EXPLAIN PLAN` to the query
-- [ ] Also support `EXPLAIN PIPELINE` and `EXPLAIN SYNTAX`
-- [ ] ExplainResult: parsed tree or raw text
-- [ ] Create `src/components/playground/explain-view.tsx`
-- [ ] Render EXPLAIN output as formatted monospace text
-- [ ] Tab selector: Plan / Pipeline / Syntax
+- [x] Create `src/lib/playground/explain.ts`
+- [x] Function `explainQuery(sql: string, client): Promise<ExplainResult>`
+- [x] Prepend `EXPLAIN PLAN` to the query
+- [x] Also support `EXPLAIN PIPELINE` and `EXPLAIN SYNTAX`
+- [x] ExplainResult: parsed tree or raw text
+- [x] Create `src/components/playground/explain-view.tsx`
+- [x] Render EXPLAIN output as formatted monospace text
+- [x] Tab selector: Plan / Pipeline / Syntax
 
 ### Task 9: Playground page assembly
 - [ ] Create `src/pages/playground-page.tsx`
