@@ -193,6 +193,13 @@ const ISOLATED_CELL_H = MAX_NODE_HEIGHT + 40
 const HEADER_HEIGHT = 40
 const DIVIDER_MARGIN = 60
 
+function getNodeDatabase(nodeId: string): string {
+  if (nodeId.startsWith('dict_')) {
+    return nodeId.slice(5).split('.')[0] ?? ''
+  }
+  return nodeId.split('.')[0] ?? ''
+}
+
 function layoutWithDagre(nodes: Node[], edges: Edge[]): LayoutResult {
   // Split nodes into connected (have at least one edge) and isolated (zero edges)
   const connectedNodeIds = new Set<string>()
@@ -221,14 +228,30 @@ function layoutWithDagre(nodes: Node[], edges: Edge[]): LayoutResult {
     return { connected: [], isolated: gridded, isolatedIds, isolatedStartY: 0, isolatedStartX: 0 }
   }
 
-  // Layout connected nodes with dagre
-  const g = new dagre.graphlib.Graph()
+  // Determine unique databases among connected nodes
+  const uniqueDbs = new Set<string>()
+  for (const node of connectedNodes) {
+    uniqueDbs.add(getNodeDatabase(node.id))
+  }
+  const useCompound = uniqueDbs.size > 1
+
+  // Layout connected nodes with dagre (compound mode groups by database)
+  const g = new dagre.graphlib.Graph({ compound: useCompound })
   g.setDefaultEdgeLabel(() => ({}))
   g.setGraph({ rankdir: 'LR', ranksep: 200, nodesep: 40, edgesep: 20 })
+
+  if (useCompound) {
+    for (const db of uniqueDbs) {
+      g.setNode(`__compound_${db}`, {})
+    }
+  }
 
   for (const node of connectedNodes) {
     const h = (node.data as { height?: number }).height ?? NODE_HEIGHT
     g.setNode(node.id, { width: NODE_WIDTH, height: h })
+    if (useCompound) {
+      g.setParent(node.id, `__compound_${getNodeDatabase(node.id)}`)
+    }
   }
 
   for (const edge of edges) {
@@ -413,6 +436,23 @@ function buildGraphData(
         minY: node.position.y,
         maxX: node.position.x + NODE_WIDTH,
         maxY: node.position.y + h,
+      }
+    }
+  }
+
+  // Mark cross-database edges with distinct styling
+  const dbNames = Object.keys(dbBounds)
+  if (dbNames.length > 1) {
+    for (const edge of edges) {
+      const srcDb = getNodeDatabase(edge.source)
+      const tgtDb = getNodeDatabase(edge.target)
+      if (srcDb !== tgtDb) {
+        edge.style = {
+          ...edge.style,
+          stroke: '#f59e0b',
+          strokeDasharray: '8 3 2 3',
+          strokeWidth: 2,
+        }
       }
     }
   }
@@ -810,6 +850,24 @@ function GraphPageInner() {
               <span className="w-6 border-t-2 border-red-400" />
               MV writes
             </span>
+            {databases.length > 1 && (
+              <>
+                <span className="flex items-center gap-1.5">
+                  <span
+                    className="w-6 border-t-2"
+                    style={{ borderColor: '#f59e0b', borderStyle: 'dashed' }}
+                  />
+                  Cross-database
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span
+                    className="w-5 h-4 rounded"
+                    style={{ border: '2px dashed #3b82f6' }}
+                  />
+                  Database boundary
+                </span>
+              </>
+            )}
             <button
               onClick={() => {
                 setShowLegend(false)

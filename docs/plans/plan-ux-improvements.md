@@ -30,10 +30,10 @@
 - [x] "All databases" shows everything with grouping
 
 ### Task 4: Graph layout with database groups
-- [ ] Adjust React Flow layout (dagre or custom) to respect database grouping
-- [ ] Nodes within same database are positioned close together
-- [ ] Cross-database edges (MV in db1 reading from table in db2) are visually distinct — different dash pattern or color
-- [ ] Legend updated: add "database boundary" entry if multiple databases
+- [x] Adjust React Flow layout (dagre or custom) to respect database grouping
+- [x] Nodes within same database are positioned close together
+- [x] Cross-database edges (MV in db1 reading from table in db2) are visually distinct — different dash pattern or color
+- [x] Legend updated: add "database boundary" entry if multiple databases
 
 ### Task 5: DDL History — add author column
 - [ ] Update system.query_log query to include `user` field (this is the ClickHouse username who executed the DDL)
