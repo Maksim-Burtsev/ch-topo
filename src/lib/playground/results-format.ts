@@ -45,9 +45,7 @@ export function sortRows(
   if (!sort) return rows
   const { column, direction } = sort
   const multiplier = direction === 'asc' ? 1 : -1
-  return [...rows].sort(
-    (a, b) => multiplier * compareValues(a[column], b[column]),
-  )
+  return [...rows].sort((a, b) => multiplier * compareValues(a[column], b[column]))
 }
 
 // ── Clipboard ─────────────────────────────────────────────────

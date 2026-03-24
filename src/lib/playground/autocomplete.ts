@@ -215,10 +215,7 @@ export function buildSchemaLookup(
 
 // ── Text before cursor helpers ─────────────────────────────────
 
-function getTextBeforeCursor(
-  model: Monaco.editor.ITextModel,
-  position: Monaco.Position,
-): string {
+function getTextBeforeCursor(model: Monaco.editor.ITextModel, position: Monaco.Position): string {
   return model.getValueInRange({
     startLineNumber: 1,
     startColumn: 1,
@@ -244,9 +241,7 @@ function detectContext(
   const textBeforeOnLine = lineContent.substring(0, position.column - 1)
 
   // Check for double-dot pattern: database.table.
-  const doubleDotMatch = textBeforeOnLine.match(
-    /(\w+)\.(\w+)\.\s*$/,
-  )
+  const doubleDotMatch = textBeforeOnLine.match(/(\w+)\.(\w+)\.\s*$/)
   if (doubleDotMatch?.[1] && doubleDotMatch[2]) {
     return {
       kind: 'dot-table',
@@ -289,10 +284,7 @@ function detectContext(
 
 // ── Build completion items ─────────────────────────────────────
 
-function makeRange(
-  model: Monaco.editor.ITextModel,
-  position: Monaco.Position,
-): Monaco.IRange {
+function makeRange(model: Monaco.editor.ITextModel, position: Monaco.Position): Monaco.IRange {
   const word = model.getWordUntilPosition(position)
   return {
     startLineNumber: position.lineNumber,
@@ -315,13 +307,9 @@ export function provideCompletionItems(
 
   if (context.kind === 'dot-table') {
     // database.table. → show columns
-    const db = schema.find(
-      (d) => d.name.toLowerCase() === context.database.toLowerCase(),
-    )
+    const db = schema.find((d) => d.name.toLowerCase() === context.database.toLowerCase())
     if (db) {
-      const table = db.tables.find(
-        (t) => t.name.toLowerCase() === context.table.toLowerCase(),
-      )
+      const table = db.tables.find((t) => t.name.toLowerCase() === context.table.toLowerCase())
       if (table) {
         for (const col of table.columns) {
           suggestions.push({
@@ -339,9 +327,7 @@ export function provideCompletionItems(
 
   if (context.kind === 'dot-database') {
     // database. → show tables (and columns if it's a table name)
-    const db = schema.find(
-      (d) => d.name.toLowerCase() === context.database.toLowerCase(),
-    )
+    const db = schema.find((d) => d.name.toLowerCase() === context.database.toLowerCase())
     if (db) {
       for (const table of db.tables) {
         suggestions.push({

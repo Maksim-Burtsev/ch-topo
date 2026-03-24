@@ -126,7 +126,16 @@ export function HistoryPage() {
 
       return true
     })
-  }, [entries, authorFilter, databaseFilter, operationFilters, statusFilter, datePreset, customFrom, customTo])
+  }, [
+    entries,
+    authorFilter,
+    databaseFilter,
+    operationFilters,
+    statusFilter,
+    datePreset,
+    customFrom,
+    customTo,
+  ])
 
   useEffect(() => {
     if (status === 'idle') {
@@ -198,25 +207,29 @@ export function HistoryPage() {
 
       {/* Filter bar: dropdowns */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        {databases.length > 1 && (
-          <DatabaseFilter databases={databases} className="w-40" />
-        )}
+        {databases.length > 1 && <DatabaseFilter databases={databases} className="w-40" />}
         {authors.length > 1 && (
           <Select
             className="w-40"
             value={authorFilter}
-            onChange={(e) => { setAuthorFilter(e.target.value) }}
+            onChange={(e) => {
+              setAuthorFilter(e.target.value)
+            }}
           >
             <option value="">All authors</option>
             {authors.map((a) => (
-              <option key={a} value={a}>{a}</option>
+              <option key={a} value={a}>
+                {a}
+              </option>
             ))}
           </Select>
         )}
         <Select
           className="w-36"
           value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value) }}
+          onChange={(e) => {
+            setStatusFilter(e.target.value)
+          }}
         >
           <option value="">All statuses</option>
           <option value="success">Success</option>
@@ -225,7 +238,9 @@ export function HistoryPage() {
         <Select
           className="w-36"
           value={datePreset}
-          onChange={(e) => { setDatePreset(e.target.value as DatePreset) }}
+          onChange={(e) => {
+            setDatePreset(e.target.value as DatePreset)
+          }}
         >
           <option value="">All time</option>
           <option value="today">Today</option>
@@ -252,14 +267,18 @@ export function HistoryPage() {
           <input
             type="date"
             value={customFrom}
-            onChange={(e) => { setCustomFrom(e.target.value) }}
+            onChange={(e) => {
+              setCustomFrom(e.target.value)
+            }}
             className="h-8 rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
           <span className="text-xs text-muted-foreground">to</span>
           <input
             type="date"
             value={customTo}
-            onChange={(e) => { setCustomTo(e.target.value) }}
+            onChange={(e) => {
+              setCustomTo(e.target.value)
+            }}
             className="h-8 rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
         </div>
@@ -274,7 +293,9 @@ export function HistoryPage() {
             <button
               key={op}
               type="button"
-              onClick={() => { toggleOperation(op) }}
+              onClick={() => {
+                toggleOperation(op)
+              }}
               className="transition-opacity"
             >
               <Badge
@@ -300,9 +321,7 @@ export function HistoryPage() {
           {filtered.length === 0 && hasActiveFilters && (
             <div className="flex flex-col items-center justify-center h-40 text-center">
               <p className="text-sm font-medium text-muted-foreground">No matching changes</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Try adjusting your filters.
-              </p>
+              <p className="mt-1 text-xs text-muted-foreground">Try adjusting your filters.</p>
             </div>
           )}
           {filtered.map((entry, i) => {
@@ -329,7 +348,10 @@ export function HistoryPage() {
                       <Badge variant={isSuccess ? 'mergetree' : 'destructive'}>
                         {isSuccess ? 'applied' : 'failed'}
                       </Badge>
-                      <Badge variant={getOperationVariant(entry.query_kind)} className="text-[10px] px-1.5 py-0">
+                      <Badge
+                        variant={getOperationVariant(entry.query_kind)}
+                        className="text-[10px] px-1.5 py-0"
+                      >
                         {entry.query_kind}
                       </Badge>
                     </div>

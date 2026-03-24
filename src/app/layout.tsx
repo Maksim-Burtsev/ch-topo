@@ -1,4 +1,14 @@
-import { FolderSync, History, LogOut, Moon, Sun, Table2, Workflow, Zap } from 'lucide-react'
+import {
+  FolderSync,
+  History,
+  LogOut,
+  Moon,
+  SquareTerminal,
+  Sun,
+  Table2,
+  Workflow,
+  Zap,
+} from 'lucide-react'
 import { useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { cn } from '@/lib/utils'
@@ -13,8 +23,9 @@ const navItems = [
   { path: '/', icon: Workflow, label: 'Graph', key: '1' },
   { path: '/tables', icon: Table2, label: 'Tables', key: '2' },
   { path: '/impact', icon: Zap, label: 'Impact', key: '3' },
-  { path: '/history', icon: History, label: 'History', key: '4' },
-  { path: '/migrations', icon: FolderSync, label: 'Migrations', key: '5' },
+  { path: '/playground', icon: SquareTerminal, label: 'Playground', key: '4' },
+  { path: '/history', icon: History, label: 'History', key: '5' },
+  { path: '/migrations', icon: FolderSync, label: 'Migrations', key: '6' },
 ]
 
 function getPageTitle(pathname: string): string {
@@ -22,6 +33,7 @@ function getPageTitle(pathname: string): string {
   if (pathname === '/tables') return 'Tables'
   if (pathname.startsWith('/tables/')) return 'Table Detail'
   if (pathname === '/impact') return 'Impact Analysis'
+  if (pathname === '/playground') return 'Playground'
   if (pathname === '/history') return 'DDL History'
   if (pathname === '/migrations') return 'Migrations'
   return 'chtopo'
@@ -51,10 +63,10 @@ export function Layout() {
 
   // Document title
   useEffect(() => {
-    document.title = `chtopo — ${title}`
+    document.title = title === 'Playground' ? 'Playground — chtopo' : `chtopo — ${title}`
   }, [title])
 
-  // Keyboard shortcuts: 1-5 nav, / focus search, Esc
+  // Keyboard shortcuts: 1-6 nav, / focus search, Esc
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       const target = e.target as HTMLElement
@@ -63,7 +75,7 @@ export function Layout() {
 
       if (isInput) return
 
-      // 1-5 for page navigation
+      // 1-6 for page navigation
       const navItem = navItems.find((item) => item.key === e.key)
       if (navItem) {
         e.preventDefault()

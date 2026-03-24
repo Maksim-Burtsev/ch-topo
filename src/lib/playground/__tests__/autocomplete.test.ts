@@ -1,10 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import type { RawTableRow, RawColumnRow } from '@/lib/clickhouse/types'
-import {
-  buildSchemaLookup,
-  provideCompletionItems,
-  type SchemaDatabase,
-} from '../autocomplete'
+import { buildSchemaLookup, provideCompletionItems, type SchemaDatabase } from '../autocomplete'
 
 // ── Mock data ──────────────────────────────────────────────────
 

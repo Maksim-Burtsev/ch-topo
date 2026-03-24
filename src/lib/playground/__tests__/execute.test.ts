@@ -1,10 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ConnectionParams } from '@/lib/clickhouse/types'
-import {
-  executeQuery,
-  parseErrorLine,
-  parseSummaryHeader,
-} from '../execute'
+import { executeQuery, parseErrorLine, parseSummaryHeader } from '../execute'
 
 // ── Test fixtures ──────────────────────────────────────────────
 
@@ -34,8 +30,7 @@ describe('parseErrorLine', () => {
   })
 
   it('extracts multi-digit line number', () => {
-    const msg =
-      "Code: 62. DB::Exception: Syntax error (line 42, col 5): something"
+    const msg = 'Code: 62. DB::Exception: Syntax error (line 42, col 5): something'
     expect(parseErrorLine(msg)).toBe(42)
   })
 
@@ -52,9 +47,7 @@ describe('parseErrorLine', () => {
 
 describe('parseSummaryHeader', () => {
   it('parses valid JSON summary', () => {
-    const result = parseSummaryHeader(
-      '{"read_rows":50,"read_bytes":2048,"elapsed_ns":100000}',
-    )
+    const result = parseSummaryHeader('{"read_rows":50,"read_bytes":2048,"elapsed_ns":100000}')
     expect(result).toEqual({
       read_rows: 50,
       read_bytes: 2048,
@@ -110,9 +103,7 @@ describe('executeQuery', () => {
   })
 
   it('sends correct headers and body', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      new Response(jsonResponse([], []), { status: 200 }),
-    )
+    vi.mocked(fetch).mockResolvedValue(new Response(jsonResponse([], []), { status: 200 }))
 
     const paramsWithPw: ConnectionParams = {
       ...params,
@@ -136,9 +127,7 @@ describe('executeQuery', () => {
   })
 
   it('does not send password header when password is empty', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      new Response(jsonResponse([], []), { status: 200 }),
-    )
+    vi.mocked(fetch).mockResolvedValue(new Response(jsonResponse([], []), { status: 200 }))
 
     await executeQuery('SELECT 1', params)
 
@@ -152,9 +141,7 @@ describe('executeQuery', () => {
     const errorMsg =
       "Code: 62. DB::Exception: Syntax error: failed at position 8 ('FORM') (line 1, col 8): FORM events"
 
-    vi.mocked(fetch).mockResolvedValue(
-      new Response(errorMsg, { status: 400 }),
-    )
+    vi.mocked(fetch).mockResolvedValue(new Response(errorMsg, { status: 400 }))
 
     const result = await executeQuery('SELECT * FORM events', params)
 
@@ -250,8 +237,7 @@ describe('executeQuery', () => {
       new Response(body, {
         status: 200,
         headers: {
-          'X-ClickHouse-Summary':
-            '{"read_rows":10,"read_bytes":200}',
+          'X-ClickHouse-Summary': '{"read_rows":10,"read_bytes":200}',
         },
       }),
     )
@@ -262,9 +248,7 @@ describe('executeQuery', () => {
   })
 
   it('returns empty error string for HTTP error with empty body', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      new Response('', { status: 500 }),
-    )
+    vi.mocked(fetch).mockResolvedValue(new Response('', { status: 500 }))
 
     const result = await executeQuery('SELECT 1', params)
     expect(result.error).toBe('HTTP 500')

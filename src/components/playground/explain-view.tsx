@@ -23,14 +23,17 @@ export function ExplainView({ result, onModeChange, className }: ExplainViewProp
   const [copied, setCopied] = useState(false)
 
   const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(result.text).then(() => {
-      setCopied(true)
-      setTimeout(() => {
-        setCopied(false)
-      }, 1500)
-    }, () => {
-      // clipboard write failed
-    })
+    navigator.clipboard.writeText(result.text).then(
+      () => {
+        setCopied(true)
+        setTimeout(() => {
+          setCopied(false)
+        }, 1500)
+      },
+      () => {
+        // clipboard write failed
+      },
+    )
   }, [result.text])
 
   return (
@@ -75,11 +78,7 @@ interface TabSelectorProps {
 
 function ExplainContent({ result }: { result: ExplainResult }) {
   if (result.error) {
-    return (
-      <div className="px-3 py-4 text-sm text-destructive">
-        {result.error}
-      </div>
-    )
+    return <div className="px-3 py-4 text-sm text-destructive">{result.error}</div>
   }
 
   if (result.text) {
@@ -104,7 +103,9 @@ function TabSelector({ activeMode, onModeChange }: TabSelectorProps) {
         <button
           key={value}
           type="button"
-          onClick={() => { onModeChange(value) }}
+          onClick={() => {
+            onModeChange(value)
+          }}
           className={cn(
             'rounded px-2.5 py-0.5 text-xs transition-colors',
             activeMode === value

@@ -55,9 +55,7 @@ interface ClickHouseSummary {
   elapsed_ns?: number
 }
 
-export function parseSummaryHeader(
-  header: string | null,
-): ClickHouseSummary | undefined {
+export function parseSummaryHeader(header: string | null): ClickHouseSummary | undefined {
   if (!header) return undefined
   try {
     return JSON.parse(header) as ClickHouseSummary
@@ -84,7 +82,9 @@ export async function executeQuery(
     } else {
       options.signal.addEventListener(
         'abort',
-        () => { controller.abort(options.signal?.reason) },
+        () => {
+          controller.abort(options.signal?.reason)
+        },
         { once: true },
       )
     }
@@ -130,8 +130,7 @@ export async function executeQuery(
     // Parse the JSON response from ClickHouse FORMAT JSON
     const parsed = JSON.parse(body) as ClickHouseJsonResponse
 
-    const { elapsed, rows_read: rowsRead, bytes_read: bytesRead } =
-      parsed.statistics
+    const { elapsed, rows_read: rowsRead, bytes_read: bytesRead } = parsed.statistics
 
     return {
       columns: parsed.meta,

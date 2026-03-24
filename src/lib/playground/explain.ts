@@ -48,7 +48,9 @@ export async function explainQuery(
     } else {
       options.signal.addEventListener(
         'abort',
-        () => { controller.abort(options.signal?.reason) },
+        () => {
+          controller.abort(options.signal?.reason)
+        },
         { once: true },
       )
     }

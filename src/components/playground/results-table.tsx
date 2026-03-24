@@ -37,18 +37,13 @@ export function ResultsTable({ result, className }: ResultsTableProps) {
   const [copiedCell, setCopiedCell] = useState<string | null>(null)
 
   const sortedRows = useMemo(() => sortRows(rows, sort), [rows, sort])
-  const visibleRows = useMemo(
-    () => sortedRows.slice(0, visibleCount),
-    [sortedRows, visibleCount],
-  )
+  const visibleRows = useMemo(() => sortedRows.slice(0, visibleCount), [sortedRows, visibleCount])
   const hasMore = visibleCount < sortedRows.length
 
   const handleSort = useCallback((columnName: string) => {
     setSort((prev) => {
       if (prev?.column === columnName) {
-        return prev.direction === 'asc'
-          ? { column: columnName, direction: 'desc' }
-          : null
+        return prev.direction === 'asc' ? { column: columnName, direction: 'desc' } : null
       }
       return { column: columnName, direction: 'asc' }
     })
@@ -58,20 +53,20 @@ export function ResultsTable({ result, className }: ResultsTableProps) {
     setVisibleCount((prev) => prev + PAGE_SIZE)
   }, [])
 
-  const handleCopy = useCallback(
-    (rowIdx: number, colName: string, value: unknown) => {
-      const key = `${rowIdx}-${colName}`
-      copyToClipboard(value).then(() => {
+  const handleCopy = useCallback((rowIdx: number, colName: string, value: unknown) => {
+    const key = `${rowIdx}-${colName}`
+    copyToClipboard(value).then(
+      () => {
         setCopiedCell(key)
         setTimeout(() => {
           setCopiedCell(null)
         }, 1500)
-      }, () => {
+      },
+      () => {
         // clipboard write failed — ignore silently
-      })
-    },
-    [],
-  )
+      },
+    )
+  }, [])
 
   if (rows.length === 0) {
     return (
@@ -92,12 +87,7 @@ export function ResultsTable({ result, className }: ResultsTableProps) {
         <TableHeader>
           <TableRow>
             {columns.map((col) => (
-              <SortableHeader
-                key={col.name}
-                column={col}
-                sort={sort}
-                onSort={handleSort}
-              />
+              <SortableHeader key={col.name} column={col} sort={sort} onSort={handleSort} />
             ))}
           </TableRow>
         </TableHeader>
@@ -161,14 +151,9 @@ function SortableHeader({ column, sort, onSort }: SortableHeaderProps) {
     >
       <span className="inline-flex items-center gap-1.5">
         <span>{column.name}</span>
-        <span className="text-[10px] font-normal text-muted-foreground/60">
-          {column.type}
-        </span>
+        <span className="text-[10px] font-normal text-muted-foreground/60">{column.type}</span>
         <Icon
-          className={cn(
-            'h-3 w-3',
-            isActive ? 'text-foreground' : 'text-muted-foreground/40',
-          )}
+          className={cn('h-3 w-3', isActive ? 'text-foreground' : 'text-muted-foreground/40')}
         />
       </span>
     </TableHead>
@@ -185,9 +170,7 @@ function CellValue({ value, copied, onClick }: CellValueProps) {
   const isNull = isNullish(value)
   const formatted = formatCellValue(value)
   const isTruncated = formatted.length > MAX_CELL_LENGTH
-  const display = isTruncated
-    ? `${formatted.slice(0, MAX_CELL_LENGTH)}…`
-    : formatted
+  const display = isTruncated ? `${formatted.slice(0, MAX_CELL_LENGTH)}…` : formatted
 
   return (
     <TableCell
@@ -196,9 +179,7 @@ function CellValue({ value, copied, onClick }: CellValueProps) {
       title={isTruncated ? formatted : undefined}
     >
       {isNull ? (
-        <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-          NULL
-        </span>
+        <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">NULL</span>
       ) : (
         <span className="truncate">{display}</span>
       )}
@@ -208,11 +189,7 @@ function CellValue({ value, copied, onClick }: CellValueProps) {
           copied ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
         )}
       >
-        {copied ? (
-          <Check className="h-3 w-3 text-emerald-400" />
-        ) : (
-          <Copy className="h-3 w-3" />
-        )}
+        {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
       </span>
     </TableCell>
   )

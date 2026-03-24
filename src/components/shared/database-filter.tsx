@@ -61,7 +61,13 @@ export function DatabaseFilter({ databases, className, onChange }: DatabaseFilte
   const effectiveValue = getEffectiveDatabase(selectedDatabase, databases)
 
   return (
-    <Select value={effectiveValue} onChange={(e) => { handleChange(e.target.value) }} className={className}>
+    <Select
+      value={effectiveValue}
+      onChange={(e) => {
+        handleChange(e.target.value)
+      }}
+      className={className}
+    >
       <option value="">All databases</option>
       {databases.map((db) => (
         <option key={db} value={db}>

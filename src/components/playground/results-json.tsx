@@ -29,20 +29,20 @@ export function ResultsJson({ result, className }: ResultsJsonProps) {
 
   const isCollapsible = rows.length > COLLAPSED_THRESHOLD
 
-  const tokenizedRows = useMemo(
-    () => rows.map((row) => tokenizeJson(row, 0)),
-    [rows],
-  )
+  const tokenizedRows = useMemo(() => rows.map((row) => tokenizeJson(row, 0)), [rows])
 
   const handleCopyAll = useCallback(() => {
-    copyToClipboard(rows).then(() => {
-      setCopied(true)
-      setTimeout(() => {
-        setCopied(false)
-      }, 1500)
-    }, () => {
-      // clipboard write failed
-    })
+    copyToClipboard(rows).then(
+      () => {
+        setCopied(true)
+        setTimeout(() => {
+          setCopied(false)
+        }, 1500)
+      },
+      () => {
+        // clipboard write failed
+      },
+    )
   }, [rows])
 
   const toggleRow = useCallback((index: number) => {
@@ -160,26 +160,29 @@ interface CollapsedRowProps {
 
 function CollapsedRow({ index, row, isLast, onToggle }: CollapsedRowProps) {
   const keys = Object.keys(row)
-  const preview =
-    keys.length <= 3
-      ? keys.join(', ')
-      : `${keys.slice(0, 3).join(', ')}, ...`
+  const preview = keys.length <= 3 ? keys.join(', ') : `${keys.slice(0, 3).join(', ')}, ...`
 
   return (
     <span className="inline">
       <button
         type="button"
-        onClick={() => { onToggle(index) }}
+        onClick={() => {
+          onToggle(index)
+        }}
         className="inline-flex items-center text-muted-foreground hover:text-foreground"
       >
         <ChevronRight className="inline h-3 w-3" />
       </button>
       <span
         className="cursor-pointer text-muted-foreground hover:text-foreground"
-        onClick={() => { onToggle(index) }}
+        onClick={() => {
+          onToggle(index)
+        }}
         role="button"
         tabIndex={0}
-        onKeyDown={(e) => { if (e.key === 'Enter') onToggle(index) }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') onToggle(index)
+        }}
       >
         {'  {'}
         <span className="text-muted-foreground/60">{` ${preview} `}</span>
@@ -199,13 +202,7 @@ interface ExpandedRowProps {
   onToggle: (index: number) => void
 }
 
-function ExpandedRow({
-  index,
-  lines,
-  isLast,
-  isCollapsible,
-  onToggle,
-}: ExpandedRowProps) {
+function ExpandedRow({ index, lines, isLast, isCollapsible, onToggle }: ExpandedRowProps) {
   return (
     <span className="inline">
       {lines.map((tokens, lineIdx) => {
@@ -216,7 +213,9 @@ function ExpandedRow({
             {isFirstLine && isCollapsible && (
               <button
                 type="button"
-                onClick={() => { onToggle(index) }}
+                onClick={() => {
+                  onToggle(index)
+                }}
                 className="inline-flex items-center text-muted-foreground hover:text-foreground"
               >
                 <ChevronDown className="inline h-3 w-3" />
@@ -230,9 +229,7 @@ function ExpandedRow({
                 {token.value}
               </span>
             ))}
-            {isLastLine && !isLast && (
-              <span className={TOKEN_CLASSES.punctuation}>,</span>
-            )}
+            {isLastLine && !isLast && <span className={TOKEN_CLASSES.punctuation}>,</span>}
             {'\n'}
           </span>
         )

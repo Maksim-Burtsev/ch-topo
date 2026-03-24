@@ -22,12 +22,7 @@ interface QueryHistoryProps {
 
 // ── Component ────────────────────────────────────────────────
 
-export function QueryHistory({
-  open,
-  onClose,
-  onSelect,
-  className,
-}: QueryHistoryProps) {
+export function QueryHistory({ open, onClose, onSelect, className }: QueryHistoryProps) {
   const [entries, setEntries] = useState<HistoryEntry[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [prevOpen, setPrevOpen] = useState(false)
@@ -41,10 +36,7 @@ export function QueryHistory({
     setPrevOpen(false)
   }
 
-  const filtered = useMemo(
-    () => filterHistory(entries, searchQuery),
-    [entries, searchQuery],
-  )
+  const filtered = useMemo(() => filterHistory(entries, searchQuery), [entries, searchQuery])
 
   const handleClear = useCallback(() => {
     clearHistory()
@@ -63,10 +55,7 @@ export function QueryHistory({
 
   return (
     <div
-      className={cn(
-        'flex h-full w-80 flex-col border-l border-border bg-background',
-        className,
-      )}
+      className={cn('flex h-full w-80 flex-col border-l border-border bg-background', className)}
     >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
@@ -103,7 +92,9 @@ export function QueryHistory({
             type="text"
             placeholder="Filter queries..."
             value={searchQuery}
-            onChange={(e) => { setSearchQuery(e.target.value) }}
+            onChange={(e) => {
+              setSearchQuery(e.target.value)
+            }}
             className="h-7 w-full rounded-md border border-input bg-transparent pl-7 pr-2 text-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
         </div>
@@ -118,11 +109,7 @@ export function QueryHistory({
         )}
 
         {filtered.map((entry) => (
-          <HistoryItem
-            key={entry.id}
-            entry={entry}
-            onSelect={handleSelect}
-          />
+          <HistoryItem key={entry.id} entry={entry} onSelect={handleSelect} />
         ))}
       </div>
     </div>
@@ -140,7 +127,9 @@ function HistoryItem({ entry, onSelect }: HistoryItemProps) {
   return (
     <button
       type="button"
-      onClick={() => { onSelect(entry.sql) }}
+      onClick={() => {
+        onSelect(entry.sql)
+      }}
       className="group w-full border-b border-border/50 px-3 py-2 text-left transition-colors hover:bg-secondary/50"
     >
       <div className="font-mono text-xs text-foreground/90 leading-snug">

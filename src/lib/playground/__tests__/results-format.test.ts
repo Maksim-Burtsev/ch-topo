@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SortState } from '../results-format'
-import {
-  compareValues,
-  formatCellValue,
-  isNullish,
-  sortRows,
-} from '../results-format'
+import { compareValues, formatCellValue, isNullish, sortRows } from '../results-format'
 
 // ── formatCellValue ─────────────────────────────────────────
 

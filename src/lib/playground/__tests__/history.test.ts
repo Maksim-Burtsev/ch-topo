@@ -17,8 +17,12 @@ beforeEach(() => {
   store.clear()
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => store.get(key) ?? null,
-    setItem: (key: string, value: string) => { store.set(key, value) },
-    removeItem: (key: string) => { store.delete(key) },
+    setItem: (key: string, value: string) => {
+      store.set(key, value)
+    },
+    removeItem: (key: string) => {
+      store.delete(key)
+    },
   })
 })
 
@@ -131,9 +135,7 @@ describe('truncateSql', () => {
   })
 
   it('uses custom max length', () => {
-    expect(truncateSql('SELECT * FROM very_long_table_name', 20)).toBe(
-      'SELECT * FROM very_l...',
-    )
+    expect(truncateSql('SELECT * FROM very_long_table_name', 20)).toBe('SELECT * FROM very_l...')
   })
 })
 

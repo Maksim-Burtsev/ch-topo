@@ -93,17 +93,13 @@ describe('tokenizeJson', () => {
 
   it('produces key tokens for object keys', () => {
     const lines = tokenizeJson({ x: 1 })
-    const keyTokens = lines.flatMap((line) =>
-      line.filter((t) => t.type === 'key'),
-    )
+    const keyTokens = lines.flatMap((line) => line.filter((t) => t.type === 'key'))
     expect(keyTokens).toContainEqual({ type: 'key', value: '"x"' })
   })
 
   it('handles objects with null values', () => {
     const lines = tokenizeJson({ val: null })
-    const nullTokens = lines.flatMap((line) =>
-      line.filter((t) => t.type === 'null'),
-    )
+    const nullTokens = lines.flatMap((line) => line.filter((t) => t.type === 'null'))
     expect(nullTokens).toContainEqual({ type: 'null', value: 'null' })
   })
 

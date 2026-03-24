@@ -16,46 +16,32 @@ const params: ConnectionParams = {
 
 describe('buildExplainQuery', () => {
   it('prepends EXPLAIN PLAN for plan mode', () => {
-    expect(buildExplainQuery('SELECT 1', 'plan')).toBe(
-      'EXPLAIN PLAN SELECT 1',
-    )
+    expect(buildExplainQuery('SELECT 1', 'plan')).toBe('EXPLAIN PLAN SELECT 1')
   })
 
   it('prepends EXPLAIN PIPELINE for pipeline mode', () => {
-    expect(buildExplainQuery('SELECT 1', 'pipeline')).toBe(
-      'EXPLAIN PIPELINE SELECT 1',
-    )
+    expect(buildExplainQuery('SELECT 1', 'pipeline')).toBe('EXPLAIN PIPELINE SELECT 1')
   })
 
   it('prepends EXPLAIN SYNTAX for syntax mode', () => {
-    expect(buildExplainQuery('SELECT 1', 'syntax')).toBe(
-      'EXPLAIN SYNTAX SELECT 1',
-    )
+    expect(buildExplainQuery('SELECT 1', 'syntax')).toBe('EXPLAIN SYNTAX SELECT 1')
   })
 
   it('trims whitespace from input', () => {
-    expect(buildExplainQuery('  SELECT 1  ', 'plan')).toBe(
-      'EXPLAIN PLAN SELECT 1',
-    )
+    expect(buildExplainQuery('  SELECT 1  ', 'plan')).toBe('EXPLAIN PLAN SELECT 1')
   })
 
   it('strips trailing semicolons', () => {
-    expect(buildExplainQuery('SELECT 1;', 'plan')).toBe(
-      'EXPLAIN PLAN SELECT 1',
-    )
+    expect(buildExplainQuery('SELECT 1;', 'plan')).toBe('EXPLAIN PLAN SELECT 1')
   })
 
   it('strips multiple trailing semicolons with whitespace', () => {
-    expect(buildExplainQuery('SELECT 1 ;; ', 'plan')).toBe(
-      'EXPLAIN PLAN SELECT 1',
-    )
+    expect(buildExplainQuery('SELECT 1 ;; ', 'plan')).toBe('EXPLAIN PLAN SELECT 1')
   })
 
   it('handles multiline queries', () => {
     const sql = 'SELECT *\nFROM events\nWHERE id = 1'
-    expect(buildExplainQuery(sql, 'pipeline')).toBe(
-      `EXPLAIN PIPELINE ${sql}`,
-    )
+    expect(buildExplainQuery(sql, 'pipeline')).toBe(`EXPLAIN PIPELINE ${sql}`)
   })
 })
 
@@ -74,9 +60,7 @@ describe('explainQuery', () => {
     const explainOutput =
       'Expression ((Projection + Before ORDER BY))\n  ReadFromMergeTree (default.events)'
 
-    vi.mocked(fetch).mockResolvedValue(
-      new Response(explainOutput, { status: 200 }),
-    )
+    vi.mocked(fetch).mockResolvedValue(new Response(explainOutput, { status: 200 }))
 
     const result = await explainQuery('SELECT * FROM events', params, 'plan')
 
@@ -86,9 +70,7 @@ describe('explainQuery', () => {
   })
 
   it('sends correct EXPLAIN PLAN query', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      new Response('plan output', { status: 200 }),
-    )
+    vi.mocked(fetch).mockResolvedValue(new Response('plan output', { status: 200 }))
 
     await explainQuery('SELECT 1', params, 'plan')
 
@@ -102,9 +84,7 @@ describe('explainQuery', () => {
   })
 
   it('sends correct EXPLAIN PIPELINE query', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      new Response('pipeline output', { status: 200 }),
-    )
+    vi.mocked(fetch).mockResolvedValue(new Response('pipeline output', { status: 200 }))
 
     await explainQuery('SELECT 1', params, 'pipeline')
 
@@ -117,9 +97,7 @@ describe('explainQuery', () => {
   })
 
   it('sends correct EXPLAIN SYNTAX query', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      new Response('syntax output', { status: 200 }),
-    )
+    vi.mocked(fetch).mockResolvedValue(new Response('syntax output', { status: 200 }))
 
     await explainQuery('SELECT 1', params, 'syntax')
 
@@ -132,9 +110,7 @@ describe('explainQuery', () => {
   })
 
   it('defaults to plan mode', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      new Response('plan output', { status: 200 }),
-    )
+    vi.mocked(fetch).mockResolvedValue(new Response('plan output', { status: 200 }))
 
     const result = await explainQuery('SELECT 1', params)
 
@@ -148,9 +124,7 @@ describe('explainQuery', () => {
   })
 
   it('sends auth headers', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      new Response('ok', { status: 200 }),
-    )
+    vi.mocked(fetch).mockResolvedValue(new Response('ok', { status: 200 }))
 
     const paramsWithPw: ConnectionParams = {
       ...params,
@@ -172,9 +146,7 @@ describe('explainQuery', () => {
   })
 
   it('does not send password header when password is empty', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      new Response('ok', { status: 200 }),
-    )
+    vi.mocked(fetch).mockResolvedValue(new Response('ok', { status: 200 }))
 
     await explainQuery('SELECT 1', params, 'plan')
 
@@ -185,12 +157,9 @@ describe('explainQuery', () => {
   })
 
   it('returns error on HTTP error', async () => {
-    const errorMsg =
-      "Code: 62. DB::Exception: Syntax error: failed at position 8 ('FORM')"
+    const errorMsg = "Code: 62. DB::Exception: Syntax error: failed at position 8 ('FORM')"
 
-    vi.mocked(fetch).mockResolvedValue(
-      new Response(errorMsg, { status: 400 }),
-    )
+    vi.mocked(fetch).mockResolvedValue(new Response(errorMsg, { status: 400 }))
 
     const result = await explainQuery('SELECT * FORM events', params, 'plan')
 
@@ -200,9 +169,7 @@ describe('explainQuery', () => {
   })
 
   it('returns HTTP status when error body is empty', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      new Response('', { status: 500 }),
-    )
+    vi.mocked(fetch).mockResolvedValue(new Response('', { status: 500 }))
 
     const result = await explainQuery('SELECT 1', params, 'plan')
     expect(result.error).toBe('HTTP 500')
@@ -280,9 +247,7 @@ describe('explainQuery', () => {
   })
 
   it('does not append FORMAT JSON to explain queries', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      new Response('output', { status: 200 }),
-    )
+    vi.mocked(fetch).mockResolvedValue(new Response('output', { status: 200 }))
 
     await explainQuery('SELECT 1', params, 'plan')
 

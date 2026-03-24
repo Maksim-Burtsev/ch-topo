@@ -542,27 +542,29 @@ function GraphPageInner() {
       const bounds = dbBounds[db]
       const palette = DB_GROUP_PALETTE[i % DB_GROUP_PALETTE.length]
       if (!bounds || !palette) return []
-      return [{
-        id: `__db_group_${db}__`,
-        type: 'database-group',
-        position: {
-          x: bounds.minX - GROUP_PADDING,
-          y: bounds.minY - GROUP_PADDING - GROUP_HEADER_H,
+      return [
+        {
+          id: `__db_group_${db}__`,
+          type: 'database-group',
+          position: {
+            x: bounds.minX - GROUP_PADDING,
+            y: bounds.minY - GROUP_PADDING - GROUP_HEADER_H,
+          },
+          selectable: false,
+          draggable: false,
+          connectable: false,
+          focusable: false,
+          zIndex: -1,
+          style: { pointerEvents: 'none' },
+          data: {
+            label: db,
+            width: bounds.maxX - bounds.minX + GROUP_PADDING * 2,
+            height: bounds.maxY - bounds.minY + GROUP_PADDING * 2 + GROUP_HEADER_H,
+            color: palette.border,
+            bgColor: palette.bg,
+          },
         },
-        selectable: false,
-        draggable: false,
-        connectable: false,
-        focusable: false,
-        zIndex: -1,
-        style: { pointerEvents: 'none' },
-        data: {
-          label: db,
-          width: bounds.maxX - bounds.minX + GROUP_PADDING * 2,
-          height: bounds.maxY - bounds.minY + GROUP_PADDING * 2 + GROUP_HEADER_H,
-          color: palette.border,
-          bgColor: palette.bg,
-        },
-      }]
+      ]
     })
   }, [computed, databases.length, databaseFilter])
 
@@ -740,7 +742,9 @@ function GraphPageInner() {
             <DatabaseFilter
               databases={databases}
               className="w-40 h-8 text-xs bg-card"
-              onChange={() => { setSelectedId(null) }}
+              onChange={() => {
+                setSelectedId(null)
+              }}
             />
           </div>
         )}
@@ -854,10 +858,7 @@ function GraphPageInner() {
                   Cross-database
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span
-                    className="w-5 h-4 rounded"
-                    style={{ border: '2px dashed #3b82f6' }}
-                  />
+                  <span className="w-5 h-4 rounded" style={{ border: '2px dashed #3b82f6' }} />
                   Database boundary
                 </span>
               </>

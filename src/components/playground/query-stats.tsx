@@ -55,9 +55,7 @@ export function QueryStats({ state, className }: QueryStatsProps) {
       >
         <span className="min-w-0 flex-1 truncate">{result.error}</span>
         {result.errorLine != null && (
-          <span className="shrink-0 text-destructive/70">
-            Line {result.errorLine}
-          </span>
+          <span className="shrink-0 text-destructive/70">Line {result.errorLine}</span>
         )}
       </div>
     )

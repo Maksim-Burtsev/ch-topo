@@ -74,9 +74,7 @@ export function tokenizeJson(value: unknown, indent: number = 0): JsonToken[][] 
 
       const firstValLine: JsonToken[] = valLines[0] ?? []
       const suffix: JsonToken[] =
-        valLines.length === 1 && !isLast
-          ? [{ type: 'punctuation', value: ',' }]
-          : []
+        valLines.length === 1 && !isLast ? [{ type: 'punctuation', value: ',' }] : []
       lines.push([
         { type: 'punctuation', value: pad + '  ' },
         { type: 'key', value: JSON.stringify(key) },
@@ -87,9 +85,7 @@ export function tokenizeJson(value: unknown, indent: number = 0): JsonToken[][] 
 
       for (let li = 1; li < valLines.length; li++) {
         const trailingSuffix: JsonToken[] =
-          li === valLines.length - 1 && !isLast
-            ? [{ type: 'punctuation', value: ',' }]
-            : []
+          li === valLines.length - 1 && !isLast ? [{ type: 'punctuation', value: ',' }] : []
         lines.push([...(valLines[li] ?? []), ...trailingSuffix])
       }
     })

@@ -77,10 +77,7 @@ export function formatTimestamp(ts: number): string {
   return date.toLocaleDateString()
 }
 
-export function filterHistory(
-  entries: HistoryEntry[],
-  query: string,
-): HistoryEntry[] {
+export function filterHistory(entries: HistoryEntry[], query: string): HistoryEntry[] {
   if (!query.trim()) return entries
   const lower = query.toLowerCase()
   return entries.filter((e) => e.sql.toLowerCase().includes(lower))
