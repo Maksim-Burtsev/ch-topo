@@ -1,5 +1,5 @@
 import Editor, { type OnMount } from '@monaco-editor/react'
-import { useCallback, useEffect, useRef } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react'
 import {
   buildSchemaLookup,
   registerSqlCompletionProvider,
@@ -8,13 +8,23 @@ import {
 import { useSchemaStore } from '@/stores/schema-store'
 import { useThemeStore } from '@/stores/theme-store'
 
+export interface SqlEditorHandle {
+  /** Returns selected text, or null if no selection */
+  getSelection: () => string | null
+  /** Returns 0-based offset of the cursor in the full text */
+  getCursorOffset: () => number
+}
+
 interface SqlEditorProps {
   value: string
   onChange: (value: string) => void
   className?: string
 }
 
-export function SqlEditor({ value, onChange, className }: SqlEditorProps) {
+export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(function SqlEditor(
+  { value, onChange, className },
+  ref,
+) {
   const theme = useThemeStore((s) => s.theme)
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null)
   const schemaRef = useRef<SchemaDatabase[]>([])
@@ -29,6 +39,24 @@ export function SqlEditor({ value, onChange, className }: SqlEditorProps) {
       schemaRef.current = buildSchemaLookup(tables, columns)
     }
   }, [tables, columns, columnsReady])
+
+  useImperativeHandle(ref, () => ({
+    getSelection() {
+      const editor = editorRef.current
+      if (!editor) return null
+      const selection = editor.getSelection()
+      if (!selection || selection.isEmpty()) return null
+      return editor.getModel()?.getValueInRange(selection) ?? null
+    },
+    getCursorOffset() {
+      const editor = editorRef.current
+      if (!editor) return 0
+      const position = editor.getPosition()
+      const model = editor.getModel()
+      if (!position || !model) return 0
+      return model.getOffsetAt(position)
+    },
+  }))
 
   const handleMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor
@@ -75,4 +103,4 @@ export function SqlEditor({ value, onChange, className }: SqlEditorProps) {
       />
     </div>
   )
-}
+})

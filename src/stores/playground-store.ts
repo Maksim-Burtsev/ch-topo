@@ -8,6 +8,8 @@ interface PlaygroundState {
   format: ResultFormat
   setFormat: (format: ResultFormat) => void
   toggleFormat: () => void
+  editorPct: number
+  setEditorPct: (pct: number) => void
 }
 
 export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
@@ -21,5 +23,9 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
   },
   toggleFormat: () => {
     set({ format: get().format === 'table' ? 'json' : 'table' })
+  },
+  editorPct: 40,
+  setEditorPct: (editorPct) => {
+    set({ editorPct })
   },
 }))
