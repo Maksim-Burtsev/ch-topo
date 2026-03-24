@@ -36,12 +36,12 @@
 - [x] Legend updated: add "database boundary" entry if multiple databases
 
 ### Task 5: DDL History — add author column
-- [ ] Update system.query_log query to include `user` field (this is the ClickHouse username who executed the DDL)
-- [ ] Also include `initial_user` if available (the original user in case of distributed DDL via ON CLUSTER)
-- [ ] Show author in timeline: add user badge next to each history entry
-- [ ] Style: muted text or small badge, e.g. "user: deploy_bot" or "user: admin"
-- [ ] If user field is empty — show "system" as fallback
-- [ ] Add author filter: dropdown to filter history by user (useful when multiple people/bots make DDL changes)
+- [x] Update system.query_log query to include `user` field (this is the ClickHouse username who executed the DDL)
+- [x] Also include `initial_user` if available (the original user in case of distributed DDL via ON CLUSTER)
+- [x] Show author in timeline: add user badge next to each history entry
+- [x] Style: muted text or small badge, e.g. "user: deploy_bot" or "user: admin"
+- [x] If user field is empty — show "system" as fallback
+- [x] Add author filter: dropdown to filter history by user (useful when multiple people/bots make DDL changes)
 
 ### Task 6: DDL History — filter improvements
 - [ ] Filter by database (same dropdown component as Tables page, reuse)

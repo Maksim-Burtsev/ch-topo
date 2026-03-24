@@ -1,8 +1,15 @@
-import { AlertTriangle, History } from 'lucide-react'
-import { useEffect } from 'react'
+import { AlertTriangle, History, User } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
+import { Select } from '@/components/ui/select'
+import type { RawDDLHistoryRow } from '@/lib/clickhouse/types'
 import { useConnectionStore } from '@/stores/connection-store'
 import { useHistoryStore } from '@/stores/history-store'
+
+function getAuthor(entry: RawDDLHistoryRow): string {
+  const user = entry.initial_user || entry.user
+  return user || 'system'
+}
 
 function SkeletonEntry() {
   return (
@@ -23,6 +30,17 @@ function SkeletonEntry() {
 
 export function HistoryPage() {
   const { status, entries, error, loadHistory } = useHistoryStore()
+  const [authorFilter, setAuthorFilter] = useState('')
+
+  const authors = useMemo(() => {
+    const set = new Set(entries.map(getAuthor))
+    return Array.from(set).sort()
+  }, [entries])
+
+  const filtered = useMemo(() => {
+    if (!authorFilter) return entries
+    return entries.filter((e) => getAuthor(e) === authorFilter)
+  }, [entries, authorFilter])
 
   useEffect(() => {
     if (status === 'idle') {
@@ -83,18 +101,35 @@ export function HistoryPage() {
 
   return (
     <div className="max-w-3xl">
-      <p className="mb-6 text-sm text-muted-foreground">
-        Recent DDL operations from system.query_log.
-      </p>
+      <div className="mb-6 flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          Recent DDL operations from system.query_log.
+        </p>
+        {authors.length > 1 && (
+          <Select
+            className="w-44"
+            value={authorFilter}
+            onChange={(e) => { setAuthorFilter(e.target.value) }}
+          >
+            <option value="">All authors</option>
+            {authors.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </Select>
+        )}
+      </div>
 
       <div className="relative">
         {/* Timeline line */}
         <div className="absolute left-[19px] top-2 bottom-2 w-px bg-border" />
 
         <div className="space-y-0">
-          {entries.map((entry, i) => {
+          {filtered.map((entry, i) => {
             const isSuccess = entry.type === 'QueryFinish'
             const durationMs = Number(entry.query_duration_ms) || 0
+            const author = getAuthor(entry)
 
             return (
               <div key={i} className="relative flex gap-4 pb-8 last:pb-0">
@@ -120,7 +155,10 @@ export function HistoryPage() {
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
                       <span>{durationMs}ms</span>
-                      <span className="rounded bg-muted px-1.5 py-0.5">{entry.user}</span>
+                      <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">
+                        <User size={10} className="text-muted-foreground/70" />
+                        {author}
+                      </span>
                     </div>
                   </div>
                   <pre className="rounded bg-muted/50 px-3 py-2 text-xs font-mono text-muted-foreground overflow-x-auto leading-relaxed">

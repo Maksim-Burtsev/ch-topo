@@ -26,6 +26,7 @@ export interface RawDDLHistoryRow {
   exception: string
   query_duration_ms: string
   user: string
+  initial_user: string
 }
 
 export interface RawColumnRow {
