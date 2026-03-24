@@ -1,10 +1,13 @@
 import { AlertTriangle, Calendar, History, User, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { DatabaseFilter } from '@/components/shared/database-filter'
 import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/select'
 import type { RawDDLHistoryRow } from '@/lib/clickhouse/types'
+import { getEffectiveDatabase } from '@/lib/database-utils'
 import { cn } from '@/lib/utils'
 import { useConnectionStore } from '@/stores/connection-store'
+import { useDatabaseFilterStore } from '@/stores/database-filter-store'
 import { useHistoryStore } from '@/stores/history-store'
 
 const OPERATION_TYPES = ['Create', 'Alter', 'Drop', 'Rename'] as const
@@ -66,8 +69,9 @@ function SkeletonEntry() {
 
 export function HistoryPage() {
   const { status, entries, error, loadHistory } = useHistoryStore()
+  const selectedDatabase = useDatabaseFilterStore((s) => s.selectedDatabase)
+  const setSelectedDatabase = useDatabaseFilterStore((s) => s.setSelectedDatabase)
   const [authorFilter, setAuthorFilter] = useState('')
-  const [databaseFilter, setDatabaseFilter] = useState('')
   const [operationFilters, setOperationFilters] = useState<string[]>([])
   const [statusFilter, setStatusFilter] = useState('')
   const [datePreset, setDatePreset] = useState<DatePreset>('')
@@ -84,9 +88,11 @@ export function HistoryPage() {
     return Array.from(set).sort()
   }, [entries])
 
+  const databaseFilter = getEffectiveDatabase(selectedDatabase, databases)
+
   const hasActiveFilters =
     authorFilter !== '' ||
-    databaseFilter !== '' ||
+    selectedDatabase !== '' ||
     operationFilters.length > 0 ||
     statusFilter !== '' ||
     datePreset !== ''
@@ -99,7 +105,7 @@ export function HistoryPage() {
 
   function resetFilters() {
     setAuthorFilter('')
-    setDatabaseFilter('')
+    setSelectedDatabase('')
     setOperationFilters([])
     setStatusFilter('')
     setDatePreset('')
@@ -217,16 +223,7 @@ export function HistoryPage() {
       {/* Filter bar: dropdowns */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {databases.length > 1 && (
-          <Select
-            className="w-40"
-            value={databaseFilter}
-            onChange={(e) => { setDatabaseFilter(e.target.value) }}
-          >
-            <option value="">All databases</option>
-            {databases.map((db) => (
-              <option key={db} value={db}>{db}</option>
-            ))}
-          </Select>
+          <DatabaseFilter databases={databases} className="w-40" />
         )}
         {authors.length > 1 && (
           <Select

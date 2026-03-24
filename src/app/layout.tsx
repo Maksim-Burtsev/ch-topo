@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { cn } from '@/lib/utils'
 import { useConnectionStore } from '@/stores/connection-store'
+import { useDatabaseFilterStore } from '@/stores/database-filter-store'
 import { useGraphStore } from '@/stores/graph-store'
 import { useHistoryStore } from '@/stores/history-store'
 import { useSchemaStore } from '@/stores/schema-store'
@@ -90,6 +91,7 @@ export function Layout() {
     useSchemaStore.getState().reset()
     useGraphStore.getState().reset()
     useHistoryStore.getState().reset()
+    useDatabaseFilterStore.getState().setSelectedDatabase('')
     void navigate('/connect')
   }
 

@@ -53,10 +53,10 @@
 - [x] Show active filter summary: "Showing 12 of 48 changes"
 
 ### Task 7: Shared database filter component
-- [ ] Extract database filter into reusable component: `src/components/shared/database-filter.tsx`
-- [ ] Used on: Tables page, Graph page, History page
-- [ ] Synced via zustand store or URL param — selecting database on one page persists when navigating to another
-- [ ] Store selected database in URL hash: `/#/tables?db=analytics` so it's shareable
+- [x] Extract database filter into reusable component: `src/components/shared/database-filter.tsx`
+- [x] Used on: Tables page, Graph page, History page
+- [x] Synced via zustand store or URL param — selecting database on one page persists when navigating to another
+- [x] Store selected database in URL hash: `/#/tables?db=analytics` so it's shareable
 
 ### Task 8: Tests and cleanup
 - [ ] Test database filter logic: multiple databases, single database, no tables

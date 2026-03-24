@@ -17,11 +17,13 @@ import { ChevronDown, ChevronRight, Info, Map } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { SchemaNode } from '@/components/graph/schema-node'
 import { TableDetailPanel } from '@/components/graph/table-detail-panel'
-import { Select } from '@/components/ui/select'
+import { DatabaseFilter } from '@/components/shared/database-filter'
 import type { RawTableRow } from '@/lib/clickhouse/types'
+import { getEffectiveDatabase } from '@/lib/database-utils'
 import type { DependencyGraph } from '@/lib/graph/types'
 import { formatBytes, formatNumber } from '@/lib/utils'
 import { useConnectionStore } from '@/stores/connection-store'
+import { useDatabaseFilterStore } from '@/stores/database-filter-store'
 import { useGraphStore } from '@/stores/graph-store'
 import { useGraphUiStore } from '@/stores/graph-ui-store'
 import { useSchemaStore } from '@/stores/schema-store'
@@ -491,7 +493,7 @@ function GraphPageInner() {
   const { fitView, setViewport } = useReactFlow()
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [databaseFilter, setDatabaseFilter] = useState('')
+  const selectedDatabase = useDatabaseFilterStore((s) => s.selectedDatabase)
   const [unlinkedCollapsed, setUnlinkedCollapsed] = useState(loadUnlinkedCollapsed)
   const showMinimap = useGraphUiStore((s) => s.showMinimap)
   const showLegend = useGraphUiStore((s) => s.showLegend)
@@ -521,6 +523,8 @@ function GraphPageInner() {
     const set = new Set(tables.map((t) => t.database))
     return [...set].sort()
   }, [tables])
+
+  const databaseFilter = getEffectiveDatabase(selectedDatabase, databases)
 
   const computed = useMemo(
     () => buildGraphData(tables, dictionaries, graph, databaseFilter),
@@ -733,21 +737,11 @@ function GraphPageInner() {
         {/* Toolbar */}
         {databases.length > 1 && (
           <div className="absolute top-3 left-3 z-10">
-            <Select
-              value={databaseFilter}
-              onChange={(e) => {
-                setDatabaseFilter(e.target.value)
-                setSelectedId(null)
-              }}
+            <DatabaseFilter
+              databases={databases}
               className="w-40 h-8 text-xs bg-card"
-            >
-              <option value="">All databases</option>
-              {databases.map((db) => (
-                <option key={db} value={db}>
-                  {db}
-                </option>
-              ))}
-            </Select>
+              onChange={() => { setSelectedId(null) }}
+            />
           </div>
         )}
 

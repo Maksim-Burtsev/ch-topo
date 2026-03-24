@@ -1,12 +1,14 @@
 import { ArrowDown, ArrowUp, ArrowUpDown, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
+import { DatabaseFilter } from '@/components/shared/database-filter'
 import { Badge } from '@/components/ui/badge'
 import { getEngineVariant } from '@/components/ui/engine-variant'
 import { Input } from '@/components/ui/input'
-import { Select } from '@/components/ui/select'
 import type { RawTableRow } from '@/lib/clickhouse/types'
+import { getEffectiveDatabase } from '@/lib/database-utils'
 import { cn, formatBytes, formatNumber } from '@/lib/utils'
+import { useDatabaseFilterStore } from '@/stores/database-filter-store'
 import { useSchemaStore } from '@/stores/schema-store'
 
 type SortField = 'name' | 'engine' | 'total_rows' | 'total_bytes' | 'compression'
@@ -51,7 +53,8 @@ export function TablesPage() {
   const status = useSchemaStore((s) => s.status)
 
   const [filter, setFilter] = useState('')
-  const [databaseFilter, setDatabaseFilter] = useState('')
+  const selectedDatabase = useDatabaseFilterStore((s) => s.selectedDatabase)
+  const setSelectedDatabase = useDatabaseFilterStore((s) => s.setSelectedDatabase)
   const [engineFilters, setEngineFilters] = useState<string[]>([])
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
@@ -62,16 +65,14 @@ export function TablesPage() {
     return [...set].sort()
   }, [tables])
 
-  // If only one database, use it even if user hasn't selected one
-  const effectiveDatabaseFilter =
-    databaseFilter === '' && databases.length === 1 ? (databases[0] ?? '') : databaseFilter
+  const effectiveDatabaseFilter = getEffectiveDatabase(selectedDatabase, databases)
 
   const engines = useMemo(() => {
     const set = new Set(tables.map((t) => t.engine))
     return [...set].sort()
   }, [tables])
 
-  const hasActiveFilters = filter !== '' || databaseFilter !== '' || engineFilters.length > 0
+  const hasActiveFilters = filter !== '' || selectedDatabase !== '' || engineFilters.length > 0
 
   function toggleEngine(engine: string) {
     setEngineFilters((prev) =>
@@ -81,7 +82,7 @@ export function TablesPage() {
 
   function resetFilters() {
     setFilter('')
-    setDatabaseFilter('')
+    setSelectedDatabase('')
     setEngineFilters([])
   }
 
@@ -90,7 +91,7 @@ export function TablesPage() {
     if (engineFilters.length > 0) {
       parts.push(`${engineFilters.length} engine${engineFilters.length !== 1 ? 's' : ''}`)
     }
-    if (databaseFilter !== '') {
+    if (selectedDatabase !== '') {
       parts.push('1 database')
     }
     if (parts.length === 0) return ''
@@ -149,7 +150,7 @@ export function TablesPage() {
     function handleKey(e: KeyboardEvent) {
       if (e.key === 'Escape' && document.activeElement === inputRef.current) {
         setFilter('')
-        setDatabaseFilter('')
+        setSelectedDatabase('')
         setEngineFilters([])
         inputRef.current?.blur()
       }
@@ -158,7 +159,7 @@ export function TablesPage() {
     return () => {
       window.removeEventListener('keydown', handleKey)
     }
-  }, [])
+  }, [setSelectedDatabase])
 
   if (!tablesReady && status === 'loading') {
     return (
@@ -210,20 +211,7 @@ export function TablesPage() {
             className="pl-9"
           />
         </div>
-        <Select
-          value={effectiveDatabaseFilter}
-          onChange={(e) => {
-            setDatabaseFilter(e.target.value)
-          }}
-          className="w-44"
-        >
-          <option value="">All databases</option>
-          {databases.map((db) => (
-            <option key={db} value={db}>
-              {db}
-            </option>
-          ))}
-        </Select>
+        <DatabaseFilter databases={databases} className="w-44" />
         <span className="text-xs text-muted-foreground">
           {filtered.length} table{filtered.length !== 1 ? 's' : ''}
         </span>
