@@ -7,7 +7,6 @@ Interactive schema topology viewer and impact analyzer for ClickHouse.
 ## Quick Start
 
 ```bash
-# Clone and run
 git clone https://github.com/user/ch-topo.git
 cd ch-topo
 npm install
@@ -18,6 +17,16 @@ Make sure your ClickHouse instance has CORS enabled:
 ```xml
 <allow_origin>*</allow_origin>
 ```
+
+## Local Development
+
+Prerequisites: [Node.js](https://nodejs.org/) 20+ and [Docker](https://www.docker.com/).
+
+```bash
+make install    # install dependencies
+make dev        # start ClickHouse in Docker + Vite dev server (http://localhost:5173)
+```
+
 
 ## Features
 
