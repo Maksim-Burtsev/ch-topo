@@ -5,10 +5,11 @@ import { DatabaseFilter } from '@/components/shared/database-filter'
 import { Badge } from '@/components/ui/badge'
 import { getEngineVariant } from '@/components/ui/engine-variant'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import type { RawTableRow } from '@/lib/clickhouse/types'
 import { getEffectiveDatabase } from '@/lib/database-utils'
 import { filterTables } from '@/lib/table-filter-utils'
-import { cn, formatBytes, formatNumber } from '@/lib/utils'
+import { formatBytes, formatNumber } from '@/lib/utils'
 import { useDatabaseFilterStore } from '@/stores/database-filter-store'
 import { useSchemaStore } from '@/stores/schema-store'
 
@@ -75,28 +76,10 @@ export function TablesPage() {
 
   const hasActiveFilters = filter !== '' || selectedDatabase !== '' || engineFilters.length > 0
 
-  function toggleEngine(engine: string) {
-    setEngineFilters((prev) =>
-      prev.includes(engine) ? prev.filter((e) => e !== engine) : [...prev, engine],
-    )
-  }
-
   function resetFilters() {
     setFilter('')
     setSelectedDatabase('')
     setEngineFilters([])
-  }
-
-  function getFilterSummary(): string {
-    const parts: string[] = []
-    if (engineFilters.length > 0) {
-      parts.push(`${engineFilters.length} engine${engineFilters.length !== 1 ? 's' : ''}`)
-    }
-    if (selectedDatabase !== '') {
-      parts.push('1 database')
-    }
-    if (parts.length === 0) return ''
-    return `Filtered: ${parts.join(', ')}`
   }
 
   const filtered = useMemo(() => {
@@ -208,12 +191,25 @@ export function TablesPage() {
           />
         </div>
         <DatabaseFilter databases={databases} className="w-44" />
+        {engines.length > 1 && (
+          <Select
+            className="w-48"
+            value={engineFilters.length === 1 ? engineFilters[0] : ''}
+            onChange={(e) => {
+              setEngineFilters(e.target.value ? [e.target.value] : [])
+            }}
+          >
+            <option value="">All engines</option>
+            {engines.map((engine) => (
+              <option key={engine} value={engine}>
+                {engine}
+              </option>
+            ))}
+          </Select>
+        )}
         <span className="text-xs text-muted-foreground">
           {filtered.length} table{filtered.length !== 1 ? 's' : ''}
         </span>
-        {getFilterSummary() && (
-          <span className="text-xs text-muted-foreground">{getFilterSummary()}</span>
-        )}
         {hasActiveFilters && (
           <button
             type="button"
@@ -225,36 +221,6 @@ export function TablesPage() {
           </button>
         )}
       </div>
-      {engines.length > 0 && (
-        <div className="mb-4 flex flex-wrap items-center gap-1.5">
-          <span className="text-xs text-muted-foreground mr-1">Engines:</span>
-          {engines.map((engine) => {
-            const isSelected = engineFilters.includes(engine)
-            return (
-              <button
-                key={engine}
-                type="button"
-                onClick={() => {
-                  toggleEngine(engine)
-                }}
-                className="transition-opacity"
-              >
-                <Badge
-                  variant={getEngineVariant(engine)}
-                  className={cn(
-                    'cursor-pointer select-none',
-                    !isSelected && engineFilters.length > 0 && 'opacity-40',
-                  )}
-                >
-                  {engine}
-                  {isSelected && <X size={10} className="ml-1" />}
-                </Badge>
-              </button>
-            )
-          })}
-        </div>
-      )}
-
       {tablesReady && tables.length === 0 && (
         <div className="flex flex-col items-center justify-center h-64 rounded-lg border border-border text-center">
           <p className="text-sm font-medium text-muted-foreground">No tables found</p>
