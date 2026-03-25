@@ -5,7 +5,6 @@ import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/select'
 import { getEffectiveDatabase } from '@/lib/database-utils'
 import { getAuthor, getOperationVariant, parseEventDate } from '@/lib/history-utils'
-import { cn } from '@/lib/utils'
 import { useConnectionStore } from '@/stores/connection-store'
 import { useDatabaseFilterStore } from '@/stores/database-filter-store'
 import { useHistoryStore } from '@/stores/history-store'
@@ -48,7 +47,7 @@ export function HistoryPage() {
   const selectedDatabase = useDatabaseFilterStore((s) => s.selectedDatabase)
   const setSelectedDatabase = useDatabaseFilterStore((s) => s.setSelectedDatabase)
   const [authorFilter, setAuthorFilter] = useState('')
-  const [operationFilters, setOperationFilters] = useState<string[]>([])
+  const [operationFilter, setOperationFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [datePreset, setDatePreset] = useState<DatePreset>('')
   const [customFrom, setCustomFrom] = useState('')
@@ -69,20 +68,14 @@ export function HistoryPage() {
   const hasActiveFilters =
     authorFilter !== '' ||
     selectedDatabase !== '' ||
-    operationFilters.length > 0 ||
+    operationFilter !== '' ||
     statusFilter !== '' ||
     datePreset !== ''
-
-  function toggleOperation(op: string) {
-    setOperationFilters((prev) =>
-      prev.includes(op) ? prev.filter((o) => o !== op) : [...prev, op],
-    )
-  }
 
   function resetFilters() {
     setAuthorFilter('')
     setSelectedDatabase('')
-    setOperationFilters([])
+    setOperationFilter('')
     setStatusFilter('')
     setDatePreset('')
     setCustomFrom('')
@@ -93,7 +86,7 @@ export function HistoryPage() {
     return entries.filter((e) => {
       if (authorFilter && getAuthor(e) !== authorFilter) return false
       if (databaseFilter && e.current_database !== databaseFilter) return false
-      if (operationFilters.length > 0 && !operationFilters.includes(e.query_kind)) return false
+      if (operationFilter && e.query_kind !== operationFilter) return false
       if (statusFilter === 'success' && e.type !== 'QueryFinish') return false
       if (statusFilter === 'failed' && e.type !== 'ExceptionWhileProcessing') return false
 
@@ -130,7 +123,7 @@ export function HistoryPage() {
     entries,
     authorFilter,
     databaseFilter,
-    operationFilters,
+    operationFilter,
     statusFilter,
     datePreset,
     customFrom,
@@ -236,6 +229,20 @@ export function HistoryPage() {
           <option value="failed">Failed</option>
         </Select>
         <Select
+          className="w-40"
+          value={operationFilter}
+          onChange={(e) => {
+            setOperationFilter(e.target.value)
+          }}
+        >
+          <option value="">All operations</option>
+          {OPERATION_TYPES.map((op) => (
+            <option key={op} value={op}>
+              {op}
+            </option>
+          ))}
+        </Select>
+        <Select
           className="w-36"
           value={datePreset}
           onChange={(e) => {
@@ -283,35 +290,6 @@ export function HistoryPage() {
           />
         </div>
       )}
-
-      {/* Operation type chips */}
-      <div className="mb-4 flex flex-wrap items-center gap-1.5">
-        <span className="text-xs text-muted-foreground mr-1">Operations:</span>
-        {OPERATION_TYPES.map((op) => {
-          const isSelected = operationFilters.includes(op)
-          return (
-            <button
-              key={op}
-              type="button"
-              onClick={() => {
-                toggleOperation(op)
-              }}
-              className="transition-opacity"
-            >
-              <Badge
-                variant={getOperationVariant(op)}
-                className={cn(
-                  'cursor-pointer select-none',
-                  !isSelected && operationFilters.length > 0 && 'opacity-40',
-                )}
-              >
-                {op}
-                {isSelected && <X size={10} className="ml-1" />}
-              </Badge>
-            </button>
-          )
-        })}
-      </div>
 
       {/* Timeline */}
       <div className="relative">
