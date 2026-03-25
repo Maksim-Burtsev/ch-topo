@@ -1,4 +1,5 @@
 import dagre from '@dagrejs/dagre'
+import type { GraphLabel, NodeLabel, EdgeLabel } from '@dagrejs/dagre'
 import {
   Background,
   BackgroundVariant,
@@ -238,13 +239,13 @@ function layoutWithDagre(nodes: Node[], edges: Edge[]): LayoutResult {
   const useCompound = uniqueDbs.size > 1
 
   // Layout connected nodes with dagre (compound mode groups by database)
-  const g = new dagre.graphlib.Graph({ compound: useCompound })
+  const g = new dagre.graphlib.Graph<GraphLabel, NodeLabel, EdgeLabel>({ compound: useCompound })
   g.setDefaultEdgeLabel(() => ({}))
   g.setGraph({ rankdir: 'LR', ranksep: 200, nodesep: 40, edgesep: 20 })
 
   if (useCompound) {
     for (const db of uniqueDbs) {
-      g.setNode(`__compound_${db}`, {})
+      g.setNode(`__compound_${db}`, { width: 0, height: 0 })
     }
   }
 
