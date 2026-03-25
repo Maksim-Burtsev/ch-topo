@@ -1,14 +1,4 @@
-import {
-  FolderSync,
-  History,
-  LogOut,
-  Moon,
-  SquareTerminal,
-  Sun,
-  Table2,
-  Workflow,
-  Zap,
-} from 'lucide-react'
+import { History, LogOut, Moon, SquareTerminal, Sun, Table2, Workflow, Zap } from 'lucide-react'
 import { useEffect } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { cn } from '@/lib/utils'
@@ -25,7 +15,6 @@ const navItems = [
   { path: '/impact', icon: Zap, label: 'Impact', key: '3' },
   { path: '/playground', icon: SquareTerminal, label: 'Playground', key: '4' },
   { path: '/history', icon: History, label: 'History', key: '5' },
-  { path: '/migrations', icon: FolderSync, label: 'Migrations', key: '6' },
 ]
 
 function getPageTitle(pathname: string): string {
@@ -35,7 +24,6 @@ function getPageTitle(pathname: string): string {
   if (pathname === '/impact') return 'Impact Analysis'
   if (pathname === '/playground') return 'Playground'
   if (pathname === '/history') return 'DDL History'
-  if (pathname === '/migrations') return 'Migrations'
   return 'chtopo'
 }
 
@@ -66,7 +54,7 @@ export function Layout() {
     document.title = title === 'Playground' ? 'Playground — chtopo' : `chtopo — ${title}`
   }, [title])
 
-  // Keyboard shortcuts: 1-6 nav, / focus search, Esc
+  // Keyboard shortcuts: 1-5 nav, / focus search, Esc
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       const target = e.target as HTMLElement
