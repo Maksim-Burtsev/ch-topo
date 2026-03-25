@@ -1,5 +1,5 @@
-import { History, LogOut, Moon, SquareTerminal, Sun, Table2, Workflow, Zap } from 'lucide-react'
-import { useEffect } from 'react'
+import { History, Loader2, LogOut, Moon, SquareTerminal, Sun, Table2, Workflow, Zap } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { cn } from '@/lib/utils'
 import { useConnectionStore } from '@/stores/connection-store'
@@ -33,12 +33,24 @@ export function Layout() {
   const title = getPageTitle(location.pathname)
   const { host, port, isConnected, disconnect } = useConnectionStore()
   const schemaStatus = useSchemaStore((s) => s.status)
+  const restoreAttempted = useRef(false)
 
-  // Auth guard: redirect to /connect if not connected
+  // Auto-reconnect from localStorage on page load
   useEffect(() => {
-    if (!isConnected) {
+    if (isConnected || restoreAttempted.current) return
+    restoreAttempted.current = true
+
+    const params = useConnectionStore.getState().restoreFromStorage()
+    if (!params) {
       void navigate('/connect')
+      return
     }
+
+    void useConnectionStore.getState().connect(params).then((ok) => {
+      if (!ok) {
+        void navigate('/connect')
+      }
+    })
   }, [isConnected, navigate])
 
   // Trigger schema loading when connected but schema not yet loaded
@@ -98,7 +110,11 @@ export function Layout() {
   const { theme, toggle: toggleTheme } = useThemeStore()
 
   if (!isConnected) {
-    return null
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
   return (
