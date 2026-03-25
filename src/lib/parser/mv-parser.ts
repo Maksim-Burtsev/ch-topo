@@ -47,7 +47,7 @@ export function parseMaterializedView(
 
   // Extract JOIN tables
   const joinRe = /\bJOIN\s+(?:`?(\w+)`?\.)?`?(\w+)`?(?:\s+(?:AS\s+)?(\w+))?/gi
-  let joinMatch: RegExpExecArray | null = null
+  let joinMatch: RegExpExecArray | null
   while ((joinMatch = joinRe.exec(selectDdl)) !== null) {
     const alias = joinMatch[3]
     if (alias) {
@@ -94,7 +94,7 @@ export function parseMaterializedView(
 
   // JOIN USING
   const usingRe = /\bUSING\s*\(([^)]+)\)/gi
-  let usingMatch: RegExpExecArray | null = null
+  let usingMatch: RegExpExecArray | null
   while ((usingMatch = usingRe.exec(selectDdl)) !== null) {
     if (usingMatch[1]) {
       addRefs(refs, usingMatch[1], 'join', knownColumns)
@@ -103,7 +103,7 @@ export function parseMaterializedView(
 
   // JOIN ON
   const onRe = /\bON\s+(.+?)(?=\bJOIN\b|\bWHERE\b|\bGROUP\b|\bORDER\b|\bLIMIT\b|$)/gi
-  let onMatch: RegExpExecArray | null = null
+  let onMatch: RegExpExecArray | null
   while ((onMatch = onRe.exec(selectDdl)) !== null) {
     if (onMatch[1]) {
       addRefs(refs, onMatch[1], 'join', knownColumns)
@@ -135,7 +135,7 @@ function addRefs(
 ): void {
   // Tokenize: extract all identifiers, including dotted ones like "e.user_id"
   const tokenRe = /(?:(\w+)\.)?(\w+)/g
-  let match: RegExpExecArray | null = null
+  let match: RegExpExecArray | null
   const seen = new Set<string>()
 
   while ((match = tokenRe.exec(clause)) !== null) {
