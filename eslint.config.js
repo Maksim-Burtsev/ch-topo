@@ -3,7 +3,7 @@ import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
-import importPlugin from 'eslint-plugin-import'
+import importPlugin from 'eslint-plugin-import-x'
 import prettier from 'eslint-config-prettier'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
@@ -19,7 +19,7 @@ export default defineConfig([
       prettier,
     ],
     plugins: {
-      import: importPlugin,
+      'import-x': importPlugin,
     },
     languageOptions: {
       ecmaVersion: 2020,
@@ -69,7 +69,7 @@ export default defineConfig([
       'no-nested-ternary': 'error',
 
       // Import ordering
-      'import/order': [
+      'import-x/order': [
         'error',
         {
           groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'],
@@ -80,7 +80,7 @@ export default defineConfig([
           alphabetize: { order: 'asc', caseInsensitive: true },
         },
       ],
-      'import/no-duplicates': 'error',
+      'import-x/no-duplicates': 'error',
 
       // Relax certain strict rules that are too noisy
       '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
