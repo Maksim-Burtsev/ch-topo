@@ -88,7 +88,12 @@ export function HistoryPage() {
       if (databaseFilter && e.current_database !== databaseFilter) return false
       if (operationFilter && e.query_kind !== operationFilter) return false
       if (statusFilter === 'success' && e.type !== 'QueryFinish') return false
-      if (statusFilter === 'failed' && e.type !== 'ExceptionWhileProcessing') return false
+      if (
+        statusFilter === 'failed' &&
+        e.type !== 'ExceptionWhileProcessing' &&
+        e.type !== 'ExceptionBeforeStart'
+      )
+        return false
 
       if (datePreset) {
         const eventDate = parseEventDate(e.event_time)

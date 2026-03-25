@@ -77,7 +77,7 @@ export function fetchDDLHistory(params: ConnectionParams) {
     `SELECT event_time, query, type, exception, query_duration_ms, user, initial_user, query_kind, current_database
 FROM system.query_log
 WHERE query_kind IN ('Create', 'Alter', 'Drop', 'Rename')
-  AND type IN ('QueryFinish', 'ExceptionWhileProcessing')
+  AND type IN ('QueryFinish', 'ExceptionWhileProcessing', 'ExceptionBeforeStart')
 ORDER BY event_time DESC
 LIMIT 200`,
   )
