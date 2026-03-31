@@ -1,4 +1,14 @@
-import { History, Loader2, LogOut, Moon, SquareTerminal, Sun, Table2, Workflow, Zap } from 'lucide-react'
+import {
+  History,
+  Loader2,
+  LogOut,
+  Moon,
+  SquareTerminal,
+  Sun,
+  Table2,
+  Workflow,
+  Zap,
+} from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { cn } from '@/lib/utils'
@@ -46,11 +56,14 @@ export function Layout() {
       return
     }
 
-    void useConnectionStore.getState().connect(params).then((ok) => {
-      if (!ok) {
-        void navigate('/connect')
-      }
-    })
+    void useConnectionStore
+      .getState()
+      .connect(params)
+      .then((ok) => {
+        if (!ok) {
+          void navigate('/connect')
+        }
+      })
   }, [isConnected, navigate])
 
   // Trigger schema loading when connected but schema not yet loaded
