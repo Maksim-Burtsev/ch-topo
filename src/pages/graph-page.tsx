@@ -560,9 +560,13 @@ function buildGraphData(
   const nodes: Node[] = []
   const edges: Edge[] = []
 
-  const filteredTables = databaseFilter
-    ? tables.filter((t) => t.database === databaseFilter)
-    : tables
+  // Dictionary-engine tables in system.tables duplicate system.dictionaries entries.
+  // Skip them so each dictionary appears only once (as the orange dictionary node).
+  const dictKeys = new Set(dictionaries.map((d) => `${d.database}.${d.name}`))
+
+  const filteredTables = (
+    databaseFilter ? tables.filter((t) => t.database === databaseFilter) : tables
+  ).filter((t) => !(t.engine === 'Dictionary' && dictKeys.has(`${t.database}.${t.name}`)))
 
   const targetTableNames = new Set<string>()
   if (graph) {
