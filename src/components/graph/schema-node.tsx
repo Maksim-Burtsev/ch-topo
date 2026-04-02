@@ -56,7 +56,7 @@ export function SchemaNode({ data }: NodeProps) {
           'bg-card',
         )}
         style={{
-          ...(d.height ? { minHeight: d.height } : {}),
+          ...(d.height ? { height: d.height } : {}),
           ...(d.selected ? { boxShadow: style.glow } : {}),
         }}
       >
