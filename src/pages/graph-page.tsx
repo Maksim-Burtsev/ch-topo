@@ -14,7 +14,7 @@ import {
 } from '@xyflow/react'
 import type { Edge, Node, NodeMouseHandler, Viewport } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { ChevronDown, ChevronRight, Info, Map } from 'lucide-react'
+import { ChevronDown, ChevronRight, Info, Map, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DictDetailPanel } from '@/components/graph/dict-detail-panel'
 import { SchemaNode } from '@/components/graph/schema-node'
@@ -777,6 +777,9 @@ function GraphPageInner() {
   const allIndices = useSchemaStore((s) => s.indices)
   const dictionaries = useSchemaStore((s) => s.dictionaries)
   const tablesReady = useSchemaStore((s) => s.tablesReady)
+  const schemaStatus = useSchemaStore((s) => s.status)
+  const loadSchema = useSchemaStore((s) => s.loadSchema)
+  const getParams = useConnectionStore((s) => s.getParams)
   const graph = useGraphStore((s) => s.graph)
   const theme = useThemeStore((s) => s.theme)
   const { fitView, setViewport } = useReactFlow()
@@ -984,6 +987,11 @@ function GraphPageInner() {
     setSelectedId(null)
   }, [])
 
+  const handleRefresh = useCallback(() => {
+    if (schemaStatus === 'loading') return
+    void loadSchema(getParams())
+  }, [schemaStatus, loadSchema, getParams])
+
   // Resolve selected dictionary first — dictionaries also exist in system.tables
   // with engine='Dictionary', so we need to check dictionaries before tables.
   const selectedDict = useMemo(() => {
@@ -1074,7 +1082,19 @@ function GraphPageInner() {
             size={1}
             color={theme === 'dark' ? '#27272a' : '#cbd5e1'}
           />
-          <Controls />
+          <Controls>
+            <button
+              onClick={handleRefresh}
+              title="Refresh schema"
+              className="react-flow__controls-button [&>svg]:!fill-none"
+            >
+              <RefreshCw
+                size={16}
+                strokeWidth={1.75}
+                className={schemaStatus === 'loading' ? 'animate-spin' : ''}
+              />
+            </button>
+          </Controls>
           {showMinimap && (
             <MiniMap
               nodeColor={(node) => {
