@@ -148,7 +148,11 @@ const nodeTypes = {
 
 const NODE_WIDTH = 180
 const NODE_HEIGHT = 70
-const MIN_NODE_HEIGHT = 60
+// Rendered heights (border-box): border-2 (4px) + py-3 (24px) + content.
+// MV/dictionary nodes show 2 lines (label+engine) ≈ 34px content → 62px total.
+// Source/target nodes show 3 lines (+rows) ≈ 50px content → 78px total.
+const MV_NODE_HEIGHT = 62
+const NON_MV_MIN_HEIGHT = 78
 const MAX_NODE_HEIGHT = 100
 
 const DB_GROUP_PALETTE = [
@@ -174,10 +178,10 @@ function getNodeType(
 
 function getNodeHeight(table: RawTableRow): number {
   const bytes = Number(table.total_bytes) || 0
-  if (bytes <= 0) return MIN_NODE_HEIGHT
+  if (bytes <= 0) return NON_MV_MIN_HEIGHT
   const logVal = Math.log10(bytes + 1)
   const normalized = Math.min(logVal / 12, 1)
-  return MIN_NODE_HEIGHT + normalized * (MAX_NODE_HEIGHT - MIN_NODE_HEIGHT)
+  return NON_MV_MIN_HEIGHT + normalized * (MAX_NODE_HEIGHT - NON_MV_MIN_HEIGHT)
 }
 
 interface LayoutResult {
@@ -336,6 +340,43 @@ function layoutWithDagre(nodes: Node[], edges: Edge[]): LayoutResult {
       position: { x: pos.x - NODE_WIDTH / 2, y: pos.y - h / 2 },
     }
   })
+
+  // Post-process: align 1-to-1 connected pairs so edges are perfectly horizontal.
+  // For each edge where the source has exactly one outgoing edge and the target has
+  // exactly one incoming edge, set the target's Y center to match the source's Y center.
+  {
+    const outDeg: Record<string, number> = {}
+    const inDeg: Record<string, number> = {}
+    for (const edge of edges) {
+      outDeg[edge.source] = (outDeg[edge.source] ?? 0) + 1
+      inDeg[edge.target] = (inDeg[edge.target] ?? 0) + 1
+    }
+
+    const nodeById: Record<string, (typeof positionedConnected)[number]> = {}
+    for (const node of positionedConnected) {
+      nodeById[node.id] = node
+    }
+
+    // Process edges left-to-right (by source X) so alignments cascade through chains
+    const sortedEdges = [...edges].sort((a, b) => {
+      const ax = nodeById[a.source]?.position.x ?? 0
+      const bx = nodeById[b.source]?.position.x ?? 0
+      return ax - bx
+    })
+
+    for (const edge of sortedEdges) {
+      if ((outDeg[edge.source] ?? 0) === 1 && (inDeg[edge.target] ?? 0) === 1) {
+        const src = nodeById[edge.source]
+        const tgt = nodeById[edge.target]
+        if (src && tgt) {
+          const srcH = (src.data as { height?: number }).height ?? NODE_HEIGHT
+          const tgtH = (tgt.data as { height?: number }).height ?? NODE_HEIGHT
+          const srcCenterY = src.position.y + srcH / 2
+          tgt.position = { ...tgt.position, y: srcCenterY - tgtH / 2 }
+        }
+      }
+    }
+  }
 
   // Compute bounds of connected graph
   let maxY = 0
@@ -533,7 +574,7 @@ function buildGraphData(
   for (const t of filteredTables) {
     const id = `${t.database}.${t.name}`
     const nt = getNodeType(t, targetTableNames)
-    const h = nt === 'mv' ? MIN_NODE_HEIGHT : getNodeHeight(t)
+    const h = nt === 'mv' ? MV_NODE_HEIGHT : getNodeHeight(t)
     nodes.push({
       id,
       type: 'schema',
@@ -563,7 +604,7 @@ function buildGraphData(
         label: d.name,
         engine: 'Dictionary',
         nodeType: 'dictionary',
-        height: MIN_NODE_HEIGHT,
+        height: MV_NODE_HEIGHT,
       },
     })
   }
