@@ -23,6 +23,38 @@ export function filterDictTables<T extends { database: string; name: string; eng
  * exactly one incoming edge, set the target's Y center to match the source's Y center.
  * Processes left-to-right so alignments cascade through chains.
  */
+/**
+ * Attach parentId to child nodes and convert their positions from absolute to
+ * relative (within their database group). Used to make database groups draggable
+ * as a unit in React Flow.
+ */
+export function attachParentIds(
+  nodes: Node[],
+  groupNodes: Node[],
+  getDatabase: (nodeId: string) => string,
+): Node[] {
+  if (groupNodes.length === 0) return nodes
+
+  const groupPositions: Record<string, { x: number; y: number }> = {}
+  for (const gn of groupNodes) {
+    const db = (gn.data as { label: string }).label
+    groupPositions[db] = gn.position
+  }
+
+  return nodes.map((node) => {
+    if (node.type === 'database-group' || node.type === 'unlinked-header') return node
+    const db = getDatabase(node.id)
+    const gp = groupPositions[db]
+    if (!gp) return node
+    return {
+      ...node,
+      parentId: `__db_group_${db}__`,
+      expandParent: true,
+      position: { x: node.position.x - gp.x, y: node.position.y - gp.y },
+    }
+  })
+}
+
 export function alignOneToOnePairs(nodes: Node[], edges: Edge[]): void {
   const outDeg: Record<string, number> = {}
   const inDeg: Record<string, number> = {}

@@ -1,6 +1,6 @@
 import type { Edge, Node } from '@xyflow/react'
 import { describe, expect, it } from 'vitest'
-import { alignOneToOnePairs, filterDictTables } from '../layout-utils'
+import { alignOneToOnePairs, attachParentIds, filterDictTables } from '../layout-utils'
 
 // ─── filterDictTables ────────────────────────────────────────────────
 
@@ -133,5 +133,104 @@ describe('alignOneToOnePairs', () => {
     const edges: Edge[] = []
     alignOneToOnePairs(nodes, edges)
     expect(nodes).toEqual([])
+  })
+})
+
+// ─── attachParentIds ─────────────────────────────────────────────────
+
+function makeGroupNode(db: string, x: number, y: number): Node {
+  return {
+    id: `__db_group_${db}__`,
+    type: 'database-group',
+    position: { x, y },
+    data: { label: db },
+  }
+}
+
+function getDb(nodeId: string): string {
+  if (nodeId.startsWith('dict_')) return nodeId.slice(5).split('.')[0] ?? ''
+  return nodeId.split('.')[0] ?? ''
+}
+
+describe('attachParentIds', () => {
+  it('sets parentId and converts positions to relative', () => {
+    const groups = [makeGroupNode('analytics', 100, 200)]
+    const nodes = [makeNode('analytics.events', 150, 250, 70)]
+
+    const result = attachParentIds(nodes, groups, getDb)
+
+    expect(result).toHaveLength(1)
+    expect(result[0]?.parentId).toBe('__db_group_analytics__')
+    expect(result[0]?.position).toEqual({ x: 50, y: 50 })
+  })
+
+  it('sets expandParent on children', () => {
+    const groups = [makeGroupNode('analytics', 0, 0)]
+    const nodes = [makeNode('analytics.events', 10, 20, 70)]
+
+    const result = attachParentIds(nodes, groups, getDb)
+
+    expect(result[0]?.expandParent).toBe(true)
+  })
+
+  it('handles multiple databases', () => {
+    const groups = [makeGroupNode('analytics', 0, 0), makeGroupNode('logs', 500, 0)]
+    const nodes = [makeNode('analytics.events', 50, 30, 70), makeNode('logs.access', 550, 30, 70)]
+
+    const result = attachParentIds(nodes, groups, getDb)
+
+    expect(result[0]?.parentId).toBe('__db_group_analytics__')
+    expect(result[0]?.position).toEqual({ x: 50, y: 30 })
+    expect(result[1]?.parentId).toBe('__db_group_logs__')
+    expect(result[1]?.position).toEqual({ x: 50, y: 30 })
+  })
+
+  it('skips nodes with no matching group', () => {
+    const groups = [makeGroupNode('analytics', 0, 0)]
+    const nodes = [makeNode('other.table', 100, 100, 70)]
+
+    const result = attachParentIds(nodes, groups, getDb)
+
+    expect(result[0]?.parentId).toBeUndefined()
+    expect(result[0]?.position).toEqual({ x: 100, y: 100 })
+  })
+
+  it('skips database-group and unlinked-header nodes', () => {
+    const groups = [makeGroupNode('analytics', 0, 0)]
+    const groupNode: Node = {
+      id: '__db_group_analytics__',
+      type: 'database-group',
+      position: { x: 0, y: 0 },
+      data: { label: 'analytics' },
+    }
+    const headerNode: Node = {
+      id: '__unlinked_header__',
+      type: 'unlinked-header',
+      position: { x: 10, y: 10 },
+      data: {},
+    }
+
+    const result = attachParentIds([groupNode, headerNode], groups, getDb)
+
+    expect(result[0]?.parentId).toBeUndefined()
+    expect(result[1]?.parentId).toBeUndefined()
+  })
+
+  it('returns nodes unchanged when no groups exist', () => {
+    const nodes = [makeNode('analytics.events', 100, 200, 70)]
+
+    const result = attachParentIds(nodes, [], getDb)
+
+    expect(result).toEqual(nodes)
+  })
+
+  it('handles dict_ prefixed node ids', () => {
+    const groups = [makeGroupNode('analytics', 0, 0)]
+    const nodes = [makeNode('dict_analytics.regions', 50, 50, 62)]
+
+    const result = attachParentIds(nodes, groups, getDb)
+
+    expect(result[0]?.parentId).toBe('__db_group_analytics__')
+    expect(result[0]?.position).toEqual({ x: 50, y: 50 })
   })
 })

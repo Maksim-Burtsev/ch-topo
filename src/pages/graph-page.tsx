@@ -22,7 +22,7 @@ import { TableDetailPanel } from '@/components/graph/table-detail-panel'
 import { DatabaseFilter } from '@/components/shared/database-filter'
 import type { RawTableRow } from '@/lib/clickhouse/types'
 import { getEffectiveDatabase } from '@/lib/database-utils'
-import { alignOneToOnePairs, filterDictTables } from '@/lib/graph/layout-utils'
+import { alignOneToOnePairs, attachParentIds, filterDictTables } from '@/lib/graph/layout-utils'
 import type { DependencyGraph } from '@/lib/graph/types'
 import { formatBytes, formatNumber } from '@/lib/utils'
 import { useConnectionStore } from '@/stores/connection-store'
@@ -133,9 +133,13 @@ function DatabaseGroupNode({ data }: { data: Record<string, unknown> }) {
         border: `2px dashed ${color}`,
         backgroundColor: bgColor,
         borderRadius: 12,
+        pointerEvents: 'none',
       }}
     >
-      <div className="px-3 pt-2 text-[11px] font-semibold" style={{ color }}>
+      <div
+        className="db-group-header px-3 pt-2 text-[11px] font-semibold cursor-grab active:cursor-grabbing"
+        style={{ color, pointerEvents: 'auto' }}
+      >
         {label}
       </div>
     </div>
@@ -811,11 +815,11 @@ function GraphPageInner() {
             y: bounds.minY - GROUP_PADDING - GROUP_HEADER_H,
           },
           selectable: false,
-          draggable: false,
+          draggable: true,
+          dragHandle: '.db-group-header',
           connectable: false,
           focusable: false,
           zIndex: -1,
-          style: { pointerEvents: 'none' },
           data: {
             label: db,
             width: bounds.maxX - bounds.minX + GROUP_PADDING * 2,
@@ -835,12 +839,14 @@ function GraphPageInner() {
     const hasConnected = layout.connected.length > 0
     const hasIsolated = layout.isolated.length > 0
 
-    if (!hasConnected && hasIsolated) return [...groupNodes, ...layout.isolated]
-    if (!hasIsolated) return [...groupNodes, ...layout.connected]
+    const withParent = (nodes: Node[]) => attachParentIds(nodes, groupNodes, getNodeDatabase)
+
+    if (!hasConnected && hasIsolated) return [...groupNodes, ...withParent(layout.isolated)]
+    if (!hasIsolated) return [...groupNodes, ...withParent(layout.connected)]
 
     // Multi-DB: isolated nodes are embedded within DB groups
     if (multiDb) {
-      return [...groupNodes, ...layout.connected, ...layout.isolated]
+      return [...groupNodes, ...withParent(layout.connected), ...withParent(layout.isolated)]
     }
 
     // Single DB: collapsible "Unlinked tables" section
