@@ -48,7 +48,12 @@ export function fetchDictionaries(params: ConnectionParams) {
     params,
     `SELECT name, database, source,
        concat('key: ', arrayStringConcat(arrayMap((n, t) -> concat(n, ' ', t), \`key.names\`, \`key.types\`), ', '),
-              ', attributes: ', arrayStringConcat(arrayMap((n, t) -> concat(n, ' ', t), \`attribute.names\`, \`attribute.types\`), ', ')) AS structure
+              ', attributes: ', arrayStringConcat(arrayMap((n, t) -> concat(n, ' ', t), \`attribute.names\`, \`attribute.types\`), ', ')) AS structure,
+       bytes_allocated,
+       \`key.names\` AS key_names,
+       \`key.types\` AS key_types,
+       \`attribute.names\` AS attribute_names,
+       \`attribute.types\` AS attribute_types
 FROM system.dictionaries`,
   )
 }

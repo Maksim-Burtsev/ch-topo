@@ -235,6 +235,11 @@ export const mockDictionaries: DictionaryInfo[] = [
     database: 'analytics',
     source: 'analytics.regions_source',
     structure: 'key: region_id UInt32, attributes: region_name String, country_code String',
+    bytes_allocated: '4096',
+    key_names: ['region_id'],
+    key_types: ['UInt32'],
+    attribute_names: ['region_name', 'country_code'],
+    attribute_types: ['String', 'String'],
   },
 ]
 

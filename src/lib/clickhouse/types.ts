@@ -54,6 +54,11 @@ export interface RawDictionaryRow {
   database: string
   source: string
   structure: string
+  bytes_allocated: string
+  key_names: string[]
+  key_types: string[]
+  attribute_names: string[]
+  attribute_types: string[]
 }
 
 export interface RawRowPolicyRow {

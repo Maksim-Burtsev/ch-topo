@@ -27,6 +27,11 @@ export interface DictionaryInfo {
   database: string
   source: string
   structure: string
+  bytes_allocated: string
+  key_names: string[]
+  key_types: string[]
+  attribute_names: string[]
+  attribute_types: string[]
 }
 
 export type ImpactSeverity = 'break' | 'stale' | 'warning'

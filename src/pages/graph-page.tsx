@@ -16,6 +16,7 @@ import type { Edge, Node, NodeMouseHandler, Viewport } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { ChevronDown, ChevronRight, Info, Map } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { DictDetailPanel } from '@/components/graph/dict-detail-panel'
 import { SchemaNode } from '@/components/graph/schema-node'
 import { TableDetailPanel } from '@/components/graph/table-detail-panel'
 import { DatabaseFilter } from '@/components/shared/database-filter'
@@ -942,12 +943,19 @@ function GraphPageInner() {
     setSelectedId(null)
   }, [])
 
-  // Resolve selected table data
-  const selectedTable = useMemo(() => {
+  // Resolve selected dictionary first — dictionaries also exist in system.tables
+  // with engine='Dictionary', so we need to check dictionaries before tables.
+  const selectedDict = useMemo(() => {
     if (!selectedId) return null
     const [db, name] = selectedId.split('.')
+    return dictionaries.find((d) => d.database === db && d.name === name) ?? null
+  }, [selectedId, dictionaries])
+
+  const selectedTable = useMemo(() => {
+    if (!selectedId || selectedDict) return null
+    const [db, name] = selectedId.split('.')
     return tables.find((t) => t.database === db && t.name === name) ?? null
-  }, [selectedId, tables])
+  }, [selectedId, selectedDict, tables])
 
   const selectedColumns = useMemo(() => {
     if (!selectedId) return []
@@ -1151,6 +1159,15 @@ function GraphPageInner() {
           columns={selectedColumns}
           indices={allIndices}
           graph={graph}
+          onClose={() => {
+            setSelectedId(null)
+          }}
+          onNavigate={handleNavigate}
+        />
+      )}
+      {selectedDict && (
+        <DictDetailPanel
+          dict={selectedDict}
           onClose={() => {
             setSelectedId(null)
           }}
