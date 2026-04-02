@@ -12,6 +12,12 @@ services:
       - clickhouse-data:/var/lib/clickhouse
       - ./docker/clickhouse/config.d:/etc/clickhouse-server/config.d
       - ./docker/clickhouse/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
     ulimits:
       nofile:
         soft: 262144
