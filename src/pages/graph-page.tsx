@@ -730,6 +730,47 @@ export function GraphPage() {
   )
 }
 
+const MIN_PANEL_W = 280
+const MAX_PANEL_W = 600
+const DEFAULT_PANEL_W = 340
+
+function ResizablePanel({ children }: { children: React.ReactNode }) {
+  const [width, setWidth] = useState(DEFAULT_PANEL_W)
+  const dragging = useRef(false)
+
+  const onMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      dragging.current = true
+      const startX = e.clientX
+      const startW = width
+
+      const onMouseMove = (ev: MouseEvent) => {
+        const delta = startX - ev.clientX
+        setWidth(Math.min(MAX_PANEL_W, Math.max(MIN_PANEL_W, startW + delta)))
+      }
+      const onMouseUp = () => {
+        dragging.current = false
+        document.removeEventListener('mousemove', onMouseMove)
+        document.removeEventListener('mouseup', onMouseUp)
+      }
+      document.addEventListener('mousemove', onMouseMove)
+      document.addEventListener('mouseup', onMouseUp)
+    },
+    [width],
+  )
+
+  return (
+    <div className="relative h-full shrink-0 flex" style={{ width }}>
+      <div
+        className="absolute left-0 top-0 h-full w-1.5 cursor-col-resize z-10 hover:bg-primary/20 active:bg-primary/30 transition-colors"
+        onMouseDown={onMouseDown}
+      />
+      <div className="flex-1 min-w-0">{children}</div>
+    </div>
+  )
+}
+
 function GraphPageInner() {
   const tables = useSchemaStore((s) => s.tables)
   const columns = useSchemaStore((s) => s.columns)
@@ -1152,27 +1193,31 @@ function GraphPageInner() {
       </div>
 
       {/* Detail Panel */}
-      {selectedTable && selectedId && (
-        <TableDetailPanel
-          tableId={selectedId}
-          table={selectedTable}
-          columns={selectedColumns}
-          indices={allIndices}
-          graph={graph}
-          onClose={() => {
-            setSelectedId(null)
-          }}
-          onNavigate={handleNavigate}
-        />
-      )}
-      {selectedDict && (
-        <DictDetailPanel
-          dict={selectedDict}
-          onClose={() => {
-            setSelectedId(null)
-          }}
-          onNavigate={handleNavigate}
-        />
+      {(selectedTable ?? selectedDict) && (
+        <ResizablePanel>
+          {selectedTable && selectedId && (
+            <TableDetailPanel
+              tableId={selectedId}
+              table={selectedTable}
+              columns={selectedColumns}
+              indices={allIndices}
+              graph={graph}
+              onClose={() => {
+                setSelectedId(null)
+              }}
+              onNavigate={handleNavigate}
+            />
+          )}
+          {selectedDict && (
+            <DictDetailPanel
+              dict={selectedDict}
+              onClose={() => {
+                setSelectedId(null)
+              }}
+              onNavigate={handleNavigate}
+            />
+          )}
+        </ResizablePanel>
       )}
     </div>
   )

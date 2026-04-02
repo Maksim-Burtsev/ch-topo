@@ -49,11 +49,13 @@ export function DictDetailPanel({ dict, onClose, onNavigate }: DictDetailPanelPr
   const [sourceExpanded, setSourceExpanded] = useState(false)
 
   return (
-    <div className="w-[340px] h-full border-l border-border bg-card flex flex-col overflow-hidden shrink-0">
+    <div className="h-full border-l border-border bg-card flex flex-col overflow-hidden shrink-0">
       {/* Header */}
       <div className="flex items-start justify-between gap-2 p-4 border-b border-border">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold truncate">{dict.name}</h3>
+          <h3 className="text-sm font-semibold overflow-x-auto whitespace-nowrap scrollbar-none">
+            {dict.name}
+          </h3>
           <p className="text-[10px] text-muted-foreground mt-0.5">{dict.database}</p>
           <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
             <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-400">

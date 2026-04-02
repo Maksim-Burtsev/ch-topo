@@ -50,7 +50,7 @@ export function SchemaNode({ data }: NodeProps) {
       <Handle type="target" position={Position.Left} className="!bg-muted-foreground !w-2 !h-2" />
       <div
         className={cn(
-          'rounded-lg border-2 px-4 py-3 min-w-[160px] shadow-lg',
+          'rounded-lg border-2 px-4 py-3 min-w-[160px] max-w-[180px] shadow-lg',
           style.border,
           style.bg,
           'bg-card',
