@@ -22,6 +22,7 @@ import { TableDetailPanel } from '@/components/graph/table-detail-panel'
 import { DatabaseFilter } from '@/components/shared/database-filter'
 import type { RawTableRow } from '@/lib/clickhouse/types'
 import { getEffectiveDatabase } from '@/lib/database-utils'
+import { alignOneToOnePairs, filterDictTables } from '@/lib/graph/layout-utils'
 import type { DependencyGraph } from '@/lib/graph/types'
 import { formatBytes, formatNumber } from '@/lib/utils'
 import { useConnectionStore } from '@/stores/connection-store'
@@ -343,41 +344,7 @@ function layoutWithDagre(nodes: Node[], edges: Edge[]): LayoutResult {
   })
 
   // Post-process: align 1-to-1 connected pairs so edges are perfectly horizontal.
-  // For each edge where the source has exactly one outgoing edge and the target has
-  // exactly one incoming edge, set the target's Y center to match the source's Y center.
-  {
-    const outDeg: Record<string, number> = {}
-    const inDeg: Record<string, number> = {}
-    for (const edge of edges) {
-      outDeg[edge.source] = (outDeg[edge.source] ?? 0) + 1
-      inDeg[edge.target] = (inDeg[edge.target] ?? 0) + 1
-    }
-
-    const nodeById: Record<string, (typeof positionedConnected)[number]> = {}
-    for (const node of positionedConnected) {
-      nodeById[node.id] = node
-    }
-
-    // Process edges left-to-right (by source X) so alignments cascade through chains
-    const sortedEdges = [...edges].sort((a, b) => {
-      const ax = nodeById[a.source]?.position.x ?? 0
-      const bx = nodeById[b.source]?.position.x ?? 0
-      return ax - bx
-    })
-
-    for (const edge of sortedEdges) {
-      if ((outDeg[edge.source] ?? 0) === 1 && (inDeg[edge.target] ?? 0) === 1) {
-        const src = nodeById[edge.source]
-        const tgt = nodeById[edge.target]
-        if (src && tgt) {
-          const srcH = (src.data as { height?: number }).height ?? NODE_HEIGHT
-          const tgtH = (tgt.data as { height?: number }).height ?? NODE_HEIGHT
-          const srcCenterY = src.position.y + srcH / 2
-          tgt.position = { ...tgt.position, y: srcCenterY - tgtH / 2 }
-        }
-      }
-    }
-  }
+  alignOneToOnePairs(positionedConnected, edges)
 
   // Compute bounds of connected graph
   let maxY = 0
@@ -561,13 +528,8 @@ function buildGraphData(
   const nodes: Node[] = []
   const edges: Edge[] = []
 
-  // Dictionary-engine tables in system.tables duplicate system.dictionaries entries.
-  // Skip them so each dictionary appears only once (as the orange dictionary node).
-  const dictKeys = new Set(dictionaries.map((d) => `${d.database}.${d.name}`))
-
-  const filteredTables = (
-    databaseFilter ? tables.filter((t) => t.database === databaseFilter) : tables
-  ).filter((t) => !(t.engine === 'Dictionary' && dictKeys.has(`${t.database}.${t.name}`)))
+  const dbFiltered = databaseFilter ? tables.filter((t) => t.database === databaseFilter) : tables
+  const filteredTables = filterDictTables(dbFiltered, dictionaries)
 
   const targetTableNames = new Set<string>()
   if (graph) {
