@@ -195,12 +195,60 @@ const ISOLATED_CELL_W = NODE_WIDTH + 40
 const ISOLATED_CELL_H = MAX_NODE_HEIGHT + 40
 const HEADER_HEIGHT = 40
 const DIVIDER_MARGIN = 60
+const DB_GROUP_GAP = 20
+const UNLINKED_INNER_MARGIN = 40
 
 function getNodeDatabase(nodeId: string): string {
   if (nodeId.startsWith('dict_')) {
     return nodeId.slice(5).split('.')[0] ?? ''
   }
   return nodeId.split('.')[0] ?? ''
+}
+
+function layoutIsolatedByDatabase(isolatedNodes: Node[], startX: number, startY: number): Node[] {
+  const byDb: Record<string, Node[]> = {}
+  for (const node of isolatedNodes) {
+    const db = getNodeDatabase(node.id)
+    const arr = byDb[db]
+    if (arr) arr.push(node)
+    else byDb[db] = [node]
+  }
+
+  const sortedDbs = Object.keys(byDb).sort()
+  const result: Node[] = []
+  let currentY = startY
+
+  for (const db of sortedDbs) {
+    const dbNodes = byDb[db]
+    if (!dbNodes) continue
+    const innerY = currentY + GROUP_HEADER_H + GROUP_PADDING
+    const innerX = startX + GROUP_PADDING
+
+    let maxBottomY = innerY
+
+    for (let i = 0; i < dbNodes.length; i++) {
+      const node = dbNodes[i]
+      if (!node) continue
+      const col = i % ISOLATED_COLS
+      const row = Math.floor(i / ISOLATED_COLS)
+      const h = (node.data as { height?: number }).height ?? NODE_HEIGHT
+      const nodeY = innerY + row * ISOLATED_CELL_H
+
+      result.push({
+        ...node,
+        position: {
+          x: innerX + col * ISOLATED_CELL_W,
+          y: nodeY,
+        },
+      })
+
+      maxBottomY = Math.max(maxBottomY, nodeY + h)
+    }
+
+    currentY = maxBottomY + GROUP_PADDING + DB_GROUP_GAP
+  }
+
+  return result
 }
 
 function layoutWithDagre(nodes: Node[], edges: Edge[]): LayoutResult {
@@ -215,8 +263,25 @@ function layoutWithDagre(nodes: Node[], edges: Edge[]): LayoutResult {
   const isolatedNodes = nodes.filter((n) => !connectedNodeIds.has(n.id))
   const isolatedIds = new Set(isolatedNodes.map((n) => n.id))
 
+  // Determine if database grouping is needed
+  const allDbsSet = new Set<string>()
+  for (const node of nodes) {
+    allDbsSet.add(getNodeDatabase(node.id))
+  }
+  const groupByDb = allDbsSet.size > 1
+
   // If all nodes are isolated (no edges at all), just grid-layout everything
   if (connectedNodes.length === 0) {
+    if (groupByDb) {
+      const positioned = layoutIsolatedByDatabase(isolatedNodes, 0, 0)
+      return {
+        connected: [],
+        isolated: positioned,
+        isolatedIds,
+        isolatedStartY: 0,
+        isolatedStartX: 0,
+      }
+    }
     const gridded = isolatedNodes.map((node, i) => {
       const col = i % ISOLATED_COLS
       const row = Math.floor(i / ISOLATED_COLS)
@@ -282,7 +347,145 @@ function layoutWithDagre(nodes: Node[], edges: Edge[]): LayoutResult {
   }
   if (!isFinite(minX)) minX = 0
 
-  // Position isolated nodes in a grid below the connected graph
+  // Multi-DB: embed isolated nodes within their respective database areas
+  if (groupByDb) {
+    // Compute per-DB connected bounds (need minX, minY, maxY)
+    const dbConnBounds: Record<string, { minX: number; minY: number; maxY: number }> = {}
+    for (const node of positionedConnected) {
+      const db = getNodeDatabase(node.id)
+      const h = (node.data as { height?: number }).height ?? NODE_HEIGHT
+      const existing = dbConnBounds[db]
+      if (existing) {
+        existing.minX = Math.min(existing.minX, node.position.x)
+        existing.minY = Math.min(existing.minY, node.position.y)
+        existing.maxY = Math.max(existing.maxY, node.position.y + h)
+      } else {
+        dbConnBounds[db] = {
+          minX: node.position.x,
+          minY: node.position.y,
+          maxY: node.position.y + h,
+        }
+      }
+    }
+
+    // Group isolated by DB
+    const isolatedByDb: Record<string, Node[]> = {}
+    for (const node of isolatedNodes) {
+      const db = getNodeDatabase(node.id)
+      const arr = isolatedByDb[db]
+      if (arr) arr.push(node)
+      else isolatedByDb[db] = [node]
+    }
+
+    // Sort connected DBs top-to-bottom by minY
+    const sortedConnDbs = Object.keys(dbConnBounds).sort(
+      (a, b) => (dbConnBounds[a]?.minY ?? 0) - (dbConnBounds[b]?.minY ?? 0),
+    )
+
+    // Calculate extra height each DB needs for its unlinked tables
+    const extraPerDb: Record<string, number> = {}
+    for (const db of sortedConnDbs) {
+      const isoNodes = isolatedByDb[db]
+      if (isoNodes && isoNodes.length > 0) {
+        const rowCount = Math.ceil(isoNodes.length / ISOLATED_COLS)
+        extraPerDb[db] = UNLINKED_INNER_MARGIN + rowCount * ISOLATED_CELL_H
+      }
+    }
+
+    // Build cumulative Y shift: each DB is pushed down by the sum of
+    // all preceding DBs' extra heights
+    let accumulated = 0
+    const shiftPerDb: Record<string, number> = {}
+    for (const db of sortedConnDbs) {
+      shiftPerDb[db] = accumulated
+      accumulated += extraPerDb[db] ?? 0
+    }
+
+    // Apply shifts to connected nodes
+    for (const node of positionedConnected) {
+      const db = getNodeDatabase(node.id)
+      const shift = shiftPerDb[db] ?? 0
+      if (shift > 0) {
+        node.position = { x: node.position.x, y: node.position.y + shift }
+      }
+    }
+
+    // Update bounds with shifts
+    for (const db of sortedConnDbs) {
+      const bounds = dbConnBounds[db]
+      const shift = shiftPerDb[db] ?? 0
+      if (bounds && shift > 0) {
+        bounds.minY += shift
+        bounds.maxY += shift
+      }
+    }
+
+    // Position unlinked tables below each DB's connected area
+    const positionedIsolated: Node[] = []
+    for (const db of sortedConnDbs) {
+      const dbNodes = isolatedByDb[db]
+      const bounds = dbConnBounds[db]
+      if (!dbNodes || !bounds) continue
+      const gridY = bounds.maxY + UNLINKED_INNER_MARGIN
+      for (let i = 0; i < dbNodes.length; i++) {
+        const node = dbNodes[i]
+        if (!node) continue
+        const col = i % ISOLATED_COLS
+        const row = Math.floor(i / ISOLATED_COLS)
+        positionedIsolated.push({
+          ...node,
+          position: {
+            x: bounds.minX + col * ISOLATED_CELL_W,
+            y: gridY + row * ISOLATED_CELL_H,
+          },
+        })
+      }
+    }
+
+    // Handle DBs with only isolated nodes (no connected)
+    const standaloneDbNames = Object.keys(isolatedByDb)
+      .filter((db) => !dbConnBounds[db])
+      .sort()
+    if (standaloneDbNames.length > 0) {
+      let overallMaxY = 0
+      for (const node of [...positionedConnected, ...positionedIsolated]) {
+        const h = (node.data as { height?: number }).height ?? NODE_HEIGHT
+        overallMaxY = Math.max(overallMaxY, node.position.y + h)
+      }
+      let currentY = overallMaxY + DIVIDER_MARGIN
+      for (const db of standaloneDbNames) {
+        const dbNodes = isolatedByDb[db]
+        if (!dbNodes) continue
+        const innerY = currentY + GROUP_HEADER_H + GROUP_PADDING
+        const innerX = minX + GROUP_PADDING
+        let groupMaxY = innerY
+        for (let i = 0; i < dbNodes.length; i++) {
+          const node = dbNodes[i]
+          if (!node) continue
+          const col = i % ISOLATED_COLS
+          const row = Math.floor(i / ISOLATED_COLS)
+          const h = (node.data as { height?: number }).height ?? NODE_HEIGHT
+          const nodeY = innerY + row * ISOLATED_CELL_H
+          positionedIsolated.push({
+            ...node,
+            position: { x: innerX + col * ISOLATED_CELL_W, y: nodeY },
+          })
+          groupMaxY = Math.max(groupMaxY, nodeY + h)
+        }
+        currentY = groupMaxY + GROUP_PADDING + DB_GROUP_GAP
+      }
+    }
+
+    return {
+      connected: positionedConnected,
+      isolated: positionedIsolated,
+      isolatedIds,
+      isolatedStartY: 0,
+      isolatedStartX: minX,
+    }
+  }
+
+  // Single DB: position isolated below connected with header
   const headerY = maxY + DIVIDER_MARGIN
   const nodesStartY = headerY + HEADER_HEIGHT
 
@@ -419,12 +622,10 @@ function buildGraphData(
 
   const layout = layoutWithDagre(nodes, edges)
 
-  // Compute database bounding boxes from connected nodes
+  // Compute database bounding boxes from all nodes (connected + isolated)
   const dbBounds: Record<string, { minX: number; minY: number; maxX: number; maxY: number }> = {}
-  for (const node of layout.connected) {
-    const db = node.id.startsWith('dict_')
-      ? (node.id.slice(5).split('.')[0] ?? '')
-      : (node.id.split('.')[0] ?? '')
+  for (const node of [...layout.connected, ...layout.isolated]) {
+    const db = getNodeDatabase(node.id)
     if (!db) continue
     const h = (node.data as { height?: number }).height ?? NODE_HEIGHT
     const existing = dbBounds[db]
@@ -539,9 +740,15 @@ function GraphPageInner() {
     const dbNames = Object.keys(dbBounds).sort()
     if (dbNames.length <= 1) return []
 
-    return dbNames.flatMap((db, i): Node[] => {
+    const colorMap: Record<string, { border: string; bg: string }> = {}
+    databases.forEach((db, i) => {
+      const p = DB_GROUP_PALETTE[i % DB_GROUP_PALETTE.length]
+      if (p) colorMap[db] = p
+    })
+
+    return dbNames.flatMap((db): Node[] => {
       const bounds = dbBounds[db]
-      const palette = DB_GROUP_PALETTE[i % DB_GROUP_PALETTE.length]
+      const palette = colorMap[db]
       if (!bounds || !palette) return []
       return [
         {
@@ -567,20 +774,24 @@ function GraphPageInner() {
         },
       ]
     })
-  }, [computed, databases.length, databaseFilter])
+  }, [computed, databases, databaseFilter])
 
-  // Build the final node list: groups + connected + header + isolated (if expanded)
+  // Build the final node list: groups + connected + isolated
+  const multiDb = databases.length > 1 && !databaseFilter
   const allNodes = useMemo(() => {
     const { layout } = computed
     const hasConnected = layout.connected.length > 0
     const hasIsolated = layout.isolated.length > 0
 
-    // All isolated, no connected: just show grid, no header
-    if (!hasConnected && hasIsolated) return layout.isolated
-    // No isolated: just connected (with optional group backgrounds)
+    if (!hasConnected && hasIsolated) return [...groupNodes, ...layout.isolated]
     if (!hasIsolated) return [...groupNodes, ...layout.connected]
 
-    // Both: groups + connected + header + optionally isolated
+    // Multi-DB: isolated nodes are embedded within DB groups
+    if (multiDb) {
+      return [...groupNodes, ...layout.connected, ...layout.isolated]
+    }
+
+    // Single DB: collapsible "Unlinked tables" section
     const headerNode: Node = {
       id: '__unlinked_header__',
       type: 'unlinked-header',
@@ -597,10 +808,10 @@ function GraphPageInner() {
     }
 
     if (unlinkedCollapsed) {
-      return [...groupNodes, ...layout.connected, headerNode]
+      return [...layout.connected, headerNode]
     }
-    return [...groupNodes, ...layout.connected, headerNode, ...layout.isolated]
-  }, [computed, groupNodes, unlinkedCollapsed, toggleUnlinkedCollapsed])
+    return [...layout.connected, headerNode, ...layout.isolated]
+  }, [computed, groupNodes, multiDb, unlinkedCollapsed, toggleUnlinkedCollapsed])
 
   const allComputedNodes = useMemo(() => {
     const { layout } = computed
