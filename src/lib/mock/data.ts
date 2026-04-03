@@ -253,6 +253,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: 'DEFAULT',
     default_expression: 'generateUUIDv4()',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -262,6 +264,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: 'CODEC(Delta, ZSTD(1))',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -271,6 +275,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: 'CODEC(Delta, ZSTD(1))',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -280,6 +286,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: 'CODEC(Delta, ZSTD(1))',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -289,6 +297,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: 'CODEC(ZSTD(1))',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -298,6 +308,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -307,6 +319,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: 'CODEC(ZSTD(3))',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -316,6 +330,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: 'CODEC(ZSTD(3))',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -325,6 +341,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -334,6 +352,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -343,6 +363,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: 'CODEC(ZSTD(1))',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -352,6 +374,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -361,6 +385,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -370,6 +396,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -379,6 +407,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -388,6 +418,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: 'CODEC(ZSTD(1))',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -397,6 +429,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: 'CODEC(Delta, ZSTD(1))',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -406,6 +440,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: 'CODEC(ZSTD(1))',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -415,6 +451,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: 'CODEC(Delta, ZSTD(1))',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -424,6 +462,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
 
   // sessions columns
@@ -435,6 +475,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: 'CODEC(ZSTD(1))',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -444,6 +486,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: 'CODEC(Delta, ZSTD(1))',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -453,6 +497,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: 'CODEC(Delta, ZSTD(1))',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -462,6 +508,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -471,6 +519,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -480,6 +530,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -489,6 +541,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -498,6 +552,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -507,6 +563,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: 'CODEC(ZSTD(1))',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -516,6 +574,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: 'CODEC(ZSTD(1))',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -525,6 +585,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
 
   // users columns
@@ -536,6 +598,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -545,6 +609,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -554,6 +620,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: 'CODEC(ZSTD(1))',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -563,6 +631,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: 'CODEC(ZSTD(1))',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -572,6 +642,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -581,6 +653,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -590,6 +664,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -599,6 +675,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -608,6 +686,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -617,6 +697,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
 
   // raw_events columns
@@ -628,6 +710,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: 'CODEC(Delta, ZSTD(1))',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -637,6 +721,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -646,6 +732,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: 'CODEC(ZSTD(3))',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -655,6 +743,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: 'CODEC(Delta, ZSTD(1))',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -664,6 +754,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -673,6 +765,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: 'CODEC(ZSTD(3))',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -682,6 +776,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -691,6 +787,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: 'DEFAULT',
     default_expression: '0',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
 
   // daily_stats columns
@@ -702,6 +800,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -711,6 +811,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -720,6 +822,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -729,6 +833,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -738,6 +844,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -747,6 +855,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -756,6 +866,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
 
   // user_funnels columns
@@ -767,6 +879,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -776,6 +890,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -785,6 +901,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -794,6 +912,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -803,6 +923,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -812,6 +934,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -821,6 +945,8 @@ export const mockColumns: ColumnInfo[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
 ]
 

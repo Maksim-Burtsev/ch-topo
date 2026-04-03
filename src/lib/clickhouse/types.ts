@@ -39,6 +39,8 @@ export interface RawColumnRow {
   default_kind: string
   default_expression: string
   compression_codec: string
+  data_compressed_bytes: string
+  data_uncompressed_bytes: string
 }
 
 export interface RawIndexRow {

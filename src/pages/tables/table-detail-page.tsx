@@ -16,7 +16,7 @@ import { formatBytes, formatNumber } from '@/lib/utils'
 import { useGraphStore } from '@/stores/graph-store'
 import { useSchemaStore } from '@/stores/schema-store'
 
-type ColSortField = 'name' | 'type' | 'mv'
+type ColSortField = 'name' | 'type' | 'size' | 'mv'
 type SortDir = 'asc' | 'desc'
 
 /** Lightweight ClickHouse DDL formatter — adds line breaks at major clauses. */
@@ -97,6 +97,9 @@ export function TableDetailPage() {
           break
         case 'type':
           cmp = a.type.localeCompare(b.type)
+          break
+        case 'size':
+          cmp = Number(a.data_compressed_bytes) - Number(b.data_compressed_bytes)
           break
         case 'mv':
           cmp = (mvCounts.get(a.name) ?? 0) - (mvCounts.get(b.name) ?? 0)
@@ -213,6 +216,17 @@ export function TableDetailPage() {
                     Default
                   </th>
                   <th
+                    className="h-9 px-4 text-right text-xs font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
+                    onClick={() => {
+                      toggleColSort('size')
+                    }}
+                  >
+                    <span className="inline-flex items-center justify-end gap-1.5">
+                      Size
+                      {colSortIcon('size')}
+                    </span>
+                  </th>
+                  <th
                     className="h-9 px-4 text-left text-xs font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
                     onClick={() => {
                       toggleColSort('mv')
@@ -244,6 +258,18 @@ export function TableDetailPage() {
                         {col.default_expression
                           ? `${col.default_kind} ${col.default_expression}`
                           : '\u2014'}
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-mono text-xs text-muted-foreground">
+                        {(() => {
+                          const compressed = Number(col.data_compressed_bytes)
+                          const uncompressed = Number(col.data_uncompressed_bytes)
+                          if (compressed === 0 && uncompressed === 0) return '\u2014'
+                          return (
+                            <span title={`Uncompressed: ${formatBytes(uncompressed)}`}>
+                              {formatBytes(compressed)}
+                            </span>
+                          )
+                        })()}
                       </td>
                       <td className="px-4 py-2.5">
                         {mvCount ? (

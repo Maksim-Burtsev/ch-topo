@@ -232,6 +232,8 @@ describe('default expression deps', () => {
         default_kind: 'MATERIALIZED',
         default_expression: "concat(page_url, '?ref=', referrer)",
         compression_codec: '',
+        data_compressed_bytes: '0',
+        data_uncompressed_bytes: '0',
       },
     ]
 

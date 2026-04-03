@@ -28,7 +28,8 @@ export function fetchColumns(params: ConnectionParams) {
   return query<RawColumnRow>(
     params,
     `SELECT database, table, name, type, default_kind,
-       default_expression, compression_codec
+       default_expression, compression_codec,
+       data_compressed_bytes, data_uncompressed_bytes
 FROM system.columns
 WHERE database NOT IN ${EXCLUDED_DBS}`,
   )

@@ -52,6 +52,8 @@ const rawColumns: RawColumnRow[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -61,6 +63,8 @@ const rawColumns: RawColumnRow[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -70,6 +74,8 @@ const rawColumns: RawColumnRow[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'analytics',
@@ -79,6 +85,8 @@ const rawColumns: RawColumnRow[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'marketing',
@@ -88,6 +96,8 @@ const rawColumns: RawColumnRow[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
   {
     database: 'marketing',
@@ -97,6 +107,8 @@ const rawColumns: RawColumnRow[] = [
     default_kind: '',
     default_expression: '',
     compression_codec: '',
+    data_compressed_bytes: '0',
+    data_uncompressed_bytes: '0',
   },
 ]
 
