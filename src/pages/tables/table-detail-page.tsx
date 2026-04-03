@@ -7,16 +7,18 @@ import {
   ClipboardCopy,
   Loader2,
 } from 'lucide-react'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { MetricCard } from '@/components/shared/metric-card'
 import { Badge } from '@/components/ui/badge'
 import { getEngineVariant } from '@/components/ui/engine-variant'
-import { formatBytes, formatNumber } from '@/lib/utils'
+import { fetchColumnUsage } from '@/lib/clickhouse/queries'
+import { formatBytes, formatNumber, formatRelativeTime } from '@/lib/utils'
+import { useConnectionStore } from '@/stores/connection-store'
 import { useGraphStore } from '@/stores/graph-store'
 import { useSchemaStore } from '@/stores/schema-store'
 
-type ColSortField = 'name' | 'type' | 'size' | 'mv'
+type ColSortField = 'name' | 'type' | 'size' | 'lastQueried' | 'mv'
 type SortDir = 'asc' | 'desc'
 
 /** Lightweight ClickHouse DDL formatter — adds line breaks at major clauses. */
@@ -63,9 +65,34 @@ export function TableDetailPage() {
   const columns = useSchemaStore((s) => s.columns)
   const columnsReady = useSchemaStore((s) => s.columnsReady)
   const graph = useGraphStore((s) => s.graph)
+  const getParams = useConnectionStore((s) => s.getParams)
 
   const [colSort, setColSort] = useState<ColSortField>('name')
   const [colDir, setColDir] = useState<SortDir>('asc')
+  const [columnUsage, setColumnUsage] = useState(new Map<string, string>())
+
+  useEffect(() => {
+    if (!database || !name) return
+    let cancelled = false
+    const prefix = `${database}.${name}.`
+    fetchColumnUsage(getParams(), database, name)
+      .then((rows) => {
+        if (cancelled) return
+        const map = new Map<string, string>()
+        for (const row of rows) {
+          if (row.col.startsWith(prefix)) {
+            map.set(row.col.slice(prefix.length), row.last_queried)
+          }
+        }
+        setColumnUsage(map)
+      })
+      .catch(() => {
+        // silently ignore — usage data is supplementary
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [database, name, getParams])
 
   const table = tables.find((t) => t.database === database && t.name === name)
 
@@ -101,6 +128,12 @@ export function TableDetailPage() {
         case 'size':
           cmp = Number(a.data_compressed_bytes) - Number(b.data_compressed_bytes)
           break
+        case 'lastQueried': {
+          const aTime = columnUsage.get(a.name) ?? ''
+          const bTime = columnUsage.get(b.name) ?? ''
+          cmp = aTime.localeCompare(bTime)
+          break
+        }
         case 'mv':
           cmp = (mvCounts.get(a.name) ?? 0) - (mvCounts.get(b.name) ?? 0)
           break
@@ -108,7 +141,7 @@ export function TableDetailPage() {
       return colDir === 'asc' ? cmp : -cmp
     })
     return sorted
-  }, [tableColumns, colSort, colDir, mvCounts])
+  }, [tableColumns, colSort, colDir, columnUsage, mvCounts])
 
   const toggleColSort = useCallback(
     (field: ColSortField) => {
@@ -229,6 +262,17 @@ export function TableDetailPage() {
                   <th
                     className="h-9 px-4 text-left text-xs font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
                     onClick={() => {
+                      toggleColSort('lastQueried')
+                    }}
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      Last queried
+                      {colSortIcon('lastQueried')}
+                    </span>
+                  </th>
+                  <th
+                    className="h-9 px-4 text-left text-xs font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
+                    onClick={() => {
                       toggleColSort('mv')
                     }}
                   >
@@ -267,6 +311,25 @@ export function TableDetailPage() {
                           return (
                             <span title={`Uncompressed: ${formatBytes(uncompressed)}`}>
                               {formatBytes(compressed)}
+                            </span>
+                          )
+                        })()}
+                      </td>
+                      <td className="px-4 py-2.5 text-xs">
+                        {(() => {
+                          const lastQueried = columnUsage.get(col.name)
+                          if (!lastQueried)
+                            return <span className="text-muted-foreground">{'\u2014'}</span>
+                          const { text, freshness, title } = formatRelativeTime(lastQueried)
+                          const colorMap = {
+                            fresh: 'text-emerald-500',
+                            stale: 'text-amber-500',
+                            dead: 'text-red-400',
+                          } as const
+                          const colorClass = colorMap[freshness]
+                          return (
+                            <span className={colorClass} title={title}>
+                              {text}
                             </span>
                           )
                         })()}
