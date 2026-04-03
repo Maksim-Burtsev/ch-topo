@@ -6,7 +6,6 @@ import {
   ChevronRight,
   ClipboardCopy,
   Loader2,
-  Zap,
 } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
@@ -125,14 +124,6 @@ export function TableDetailPage() {
     return colDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
   }
 
-  const handleDropColumn = useCallback(
-    (colName: string) => {
-      const sql = `ALTER TABLE ${database}.${name} DROP COLUMN ${colName}`
-      void navigate(`/impact?sql=${encodeURIComponent(sql)}`)
-    },
-    [database, name, navigate],
-  )
-
   if (!table) {
     return (
       <div className="flex items-center justify-center h-64 text-muted-foreground">
@@ -232,9 +223,6 @@ export function TableDetailPage() {
                       {colSortIcon('mv')}
                     </span>
                   </th>
-                  <th className="h-9 px-4 text-left text-xs font-medium text-muted-foreground">
-                    Impact
-                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -263,18 +251,6 @@ export function TableDetailPage() {
                             {mvCount} MV{mvCount > 1 ? 's' : ''}
                           </Badge>
                         ) : null}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <button
-                          onClick={() => {
-                            handleDropColumn(col.name)
-                          }}
-                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                          title={`Analyze: ALTER TABLE ${database}.${name} DROP COLUMN ${col.name}`}
-                        >
-                          <Zap size={11} />
-                          Drop?
-                        </button>
                       </td>
                     </tr>
                   )
