@@ -2,7 +2,6 @@ import { query } from './client'
 import type {
   ConnectionParams,
   RawColumnRow,
-  RawColumnUsageRow,
   RawDDLHistoryRow,
   RawDictionaryRow,
   RawGrantRow,
@@ -75,20 +74,6 @@ export function fetchGrants(params: ConnectionParams) {
        database, table, column, grant_option
 FROM system.grants
 WHERE column <> ''`,
-  )
-}
-
-export function fetchColumnUsage(params: ConnectionParams, database: string, table: string) {
-  return query<RawColumnUsageRow>(
-    params,
-    `SELECT
-  arrayJoin(columns) AS col,
-  max(event_time) AS last_queried
-FROM system.query_log
-WHERE type = 'QueryFinish'
-  AND has(databases, '${database}')
-  AND has(tables, '${database}.${table}')
-GROUP BY col`,
   )
 }
 

@@ -71,11 +71,6 @@ export interface RawRowPolicyRow {
   select_filter: string
 }
 
-export interface RawColumnUsageRow {
-  col: string
-  last_queried: string
-}
-
 export interface RawGrantRow {
   user_name: string
   role_name: string
