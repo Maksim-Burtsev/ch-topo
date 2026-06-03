@@ -2,21 +2,40 @@
 
 Interactive schema topology viewer and impact analyzer for ClickHouse.
 
-![Screenshot placeholder](docs/screenshot.png)
+`chtopo` is currently a local/developer tool. The browser connects directly to the
+ClickHouse HTTP interface, so use it only with trusted local or internal
+ClickHouse instances until Server Mode is available.
 
 ## Quick Start
 
 ```bash
-git clone https://github.com/user/ch-topo.git
+git clone https://github.com/Maksim-Burtsev/ch-topo.git
 cd ch-topo
 npm install
-npm run dev
+make dev
 ```
 
-Make sure your ClickHouse instance has CORS enabled:
+Open `http://localhost:5173` and connect to the bundled local ClickHouse instance:
+
+- Host: `localhost`
+- Port: `8123`
+- Database: `default`
+- User: `default`
+- Password: empty
+
+`make dev` starts ClickHouse through Docker and then starts the Vite dev server.
+
+## Direct Mode
+
+Direct Mode requires the target ClickHouse HTTP interface to be reachable from
+the browser. External ClickHouse instances must allow browser CORS requests:
+
 ```xml
 <allow_origin>*</allow_origin>
 ```
+
+Direct Mode is not a production security boundary. Do not expose production
+ClickHouse credentials to an untrusted browser.
 
 ## Local Development
 
@@ -25,8 +44,11 @@ Prerequisites: [Node.js](https://nodejs.org/) 20+ and [Docker](https://www.docke
 ```bash
 make install    # install dependencies
 make dev        # start ClickHouse in Docker + Vite dev server (http://localhost:5173)
+make check      # run typecheck, lint, format check, and tests
 ```
 
+The UI is designed for desktop/admin workflows. Use a viewport of at least
+1024px wide.
 
 ## Features
 
@@ -44,3 +66,7 @@ make dev        # start ClickHouse in Docker + Vite dev server (http://localhost
 - React Flow (xyflow)
 - Zustand
 - Vite
+
+## License
+
+MIT
