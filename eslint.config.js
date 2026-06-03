@@ -7,10 +7,62 @@ import importPlugin from 'eslint-plugin-import-x'
 import prettier from 'eslint-config-prettier'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
+const baseRules = {
+  // TypeScript strict
+  '@typescript-eslint/no-explicit-any': 'error',
+  '@typescript-eslint/no-unused-vars': [
+    'error',
+    { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+  ],
+  '@typescript-eslint/consistent-type-imports': [
+    'error',
+    { prefer: 'type-imports', fixStyle: 'separate-type-imports' },
+  ],
+  '@typescript-eslint/naming-convention': [
+    'error',
+    {
+      selector: 'variable',
+      format: ['camelCase', 'PascalCase', 'UPPER_CASE'],
+    },
+    {
+      selector: 'function',
+      format: ['camelCase', 'PascalCase'],
+    },
+    {
+      selector: 'typeLike',
+      format: ['PascalCase'],
+    },
+  ],
+  '@typescript-eslint/no-unnecessary-condition': 'error',
+  '@typescript-eslint/prefer-nullish-coalescing': 'error',
+  '@typescript-eslint/no-floating-promises': 'error',
+  '@typescript-eslint/no-misused-promises': 'error',
+
+  // General
+  'no-console': ['warn', { allow: ['error'] }],
+  'prefer-const': 'error',
+  'no-nested-ternary': 'error',
+
+  // Import ordering
+  'import-x/order': [
+    'error',
+    {
+      groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'],
+      pathGroups: [{ pattern: '@/**', group: 'internal' }],
+      'newlines-between': 'never',
+      alphabetize: { order: 'asc', caseInsensitive: true },
+    },
+  ],
+  'import-x/no-duplicates': 'error',
+
+  // Relax certain strict rules that are too noisy
+  '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
+}
+
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'dist-api']),
   {
-    files: ['**/*.{ts,tsx}'],
+    files: ['src/**/*.{ts,tsx}'],
     extends: [
       js.configs.recommended,
       tseslint.configs.strictTypeChecked,
@@ -30,60 +82,28 @@ export default defineConfig([
       },
     },
     rules: {
-      // TypeScript strict
-      '@typescript-eslint/no-explicit-any': 'error',
-      '@typescript-eslint/no-unused-vars': [
-        'error',
-        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
-      ],
-      '@typescript-eslint/consistent-type-imports': [
-        'error',
-        { prefer: 'type-imports', fixStyle: 'separate-type-imports' },
-      ],
-      '@typescript-eslint/naming-convention': [
-        'error',
-        {
-          selector: 'variable',
-          format: ['camelCase', 'PascalCase', 'UPPER_CASE'],
-        },
-        {
-          selector: 'function',
-          format: ['camelCase', 'PascalCase'],
-        },
-        {
-          selector: 'typeLike',
-          format: ['PascalCase'],
-        },
-      ],
-      '@typescript-eslint/no-unnecessary-condition': 'error',
-      '@typescript-eslint/prefer-nullish-coalescing': 'error',
-      '@typescript-eslint/no-floating-promises': 'error',
-      '@typescript-eslint/no-misused-promises': 'error',
+      ...baseRules,
 
       // React hooks
       'react-hooks/exhaustive-deps': 'error',
-
-      // General
-      'no-console': ['warn', { allow: ['error'] }],
-      'prefer-const': 'error',
-      'no-nested-ternary': 'error',
-
-      // Import ordering
-      'import-x/order': [
-        'error',
-        {
-          groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'],
-          pathGroups: [
-            { pattern: '@/**', group: 'internal' },
-          ],
-          'newlines-between': 'never',
-          alphabetize: { order: 'asc', caseInsensitive: true },
-        },
-      ],
-      'import-x/no-duplicates': 'error',
-
-      // Relax certain strict rules that are too noisy
-      '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
+    },
+  },
+  {
+    files: ['api/**/*.ts'],
+    extends: [js.configs.recommended, tseslint.configs.strictTypeChecked, prettier],
+    plugins: {
+      'import-x': importPlugin,
+    },
+    languageOptions: {
+      ecmaVersion: 2023,
+      globals: globals.node,
+      parserOptions: {
+        project: './api/tsconfig.json',
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      ...baseRules,
     },
   },
 ])
