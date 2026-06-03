@@ -1,0 +1,14 @@
+.git
+.github
+.claude
+node_modules
+dist
+coverage
+*.log
+.env
+.env.*
+Dockerfile
+docker-compose.yml
+docker/clickhouse
+README.md
+PRODUCTION_READINESS_TASKS.md
