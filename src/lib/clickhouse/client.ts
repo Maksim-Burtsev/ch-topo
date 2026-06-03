@@ -1,3 +1,4 @@
+import { executeClickHouseRequest } from './transport'
 import type { ConnectionParams } from './types'
 
 export class ClickHouseError extends Error {
@@ -10,23 +11,9 @@ export class ClickHouseError extends Error {
 }
 
 export async function query<T>(params: ConnectionParams, sql: string): Promise<T[]> {
-  const url = `http://${params.host}:${params.port}/`
-
-  const headers: Record<string, string> = {
-    'X-ClickHouse-User': params.user,
-    'X-ClickHouse-Database': params.database,
-  }
-  if (params.password) {
-    headers['X-ClickHouse-Key'] = params.password
-  }
-
-  let response: Response
+  let response: Awaited<ReturnType<typeof executeClickHouseRequest>>
   try {
-    response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: `${sql} FORMAT JSONEachRow`,
-    })
+    response = await executeClickHouseRequest({ params, sql, format: 'JSONEachRow' })
   } catch (err) {
     if (err instanceof TypeError) {
       throw new ClickHouseError(
@@ -37,7 +24,7 @@ export async function query<T>(params: ConnectionParams, sql: string): Promise<T
     throw err
   }
 
-  const body = await response.text()
+  const body = response.body
 
   if (!response.ok) {
     const message = body.trim() || `HTTP ${response.status}`

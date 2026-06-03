@@ -1,3 +1,4 @@
+import { executeClickHouseRequest } from '@/lib/clickhouse/transport'
 import type { ConnectionParams } from '@/lib/clickhouse/types'
 
 // ── Types ──────────────────────────────────────────────────────
@@ -60,27 +61,16 @@ export async function explainQuery(
     controller.abort(new DOMException('Query timed out', 'TimeoutError'))
   }, timeoutMs)
 
-  const url = `http://${params.host}:${params.port}/`
-
-  const headers: Record<string, string> = {
-    'X-ClickHouse-User': params.user,
-    'X-ClickHouse-Database': params.database,
-  }
-  if (params.password) {
-    headers['X-ClickHouse-Key'] = params.password
-  }
-
   const explainSql = buildExplainQuery(sql, mode)
 
   try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: explainSql,
+    const response = await executeClickHouseRequest({
+      params,
+      sql: explainSql,
       signal: controller.signal,
     })
 
-    const body = await response.text()
+    const body = response.body
 
     if (!response.ok) {
       return {
