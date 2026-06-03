@@ -3,33 +3,20 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import type { ConnectionParams } from '@/lib/clickhouse/types'
+import { loadStoredConnection, toConnectionParams } from '@/lib/connection-storage'
 import { useConnectionStore } from '@/stores/connection-store'
 import { useSchemaStore } from '@/stores/schema-store'
-
-const STORAGE_KEY = 'chtopo_connection'
-
-function loadSaved(): ConnectionParams | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    return JSON.parse(raw) as ConnectionParams
-  } catch {
-    return null
-  }
-}
-
-const saved = loadSaved()
 
 export function ConnectPage() {
   const navigate = useNavigate()
   const { isConnecting, error, connect } = useConnectionStore()
+  const [saved] = useState(() => loadStoredConnection())
 
   const [host, setHost] = useState(saved?.host ?? 'localhost')
   const [port, setPort] = useState(String(saved?.port ?? 8123))
   const [database, setDatabase] = useState(saved?.database ?? 'default')
   const [user, setUser] = useState(saved?.user ?? 'default')
-  const [password, setPassword] = useState(saved?.password ?? '')
+  const [password, setPassword] = useState('')
   const autoConnectRef = useRef(false)
 
   useEffect(() => {
@@ -37,14 +24,15 @@ export function ConnectPage() {
     autoConnectRef.current = true
 
     if (saved) {
-      void connect(saved).then((ok) => {
+      const params = toConnectionParams(saved)
+      void connect(params).then((ok) => {
         if (ok) {
-          void useSchemaStore.getState().loadSchema(saved)
+          void useSchemaStore.getState().loadSchema(params)
           void navigate('/')
         }
       })
     }
-  }, [connect, navigate])
+  }, [connect, navigate, saved])
 
   function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault()
@@ -77,6 +65,12 @@ export function ConnectPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs leading-relaxed text-amber-700 dark:text-amber-200">
+            Direct Mode is for local or trusted internal ClickHouse only. The browser sends
+            credentials directly to ClickHouse; passwords are used for this session and are never
+            saved.
+          </div>
+
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2">
               <label className="mb-1.5 block text-xs text-muted-foreground">Host</label>

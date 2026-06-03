@@ -1,8 +1,12 @@
 import { create } from 'zustand'
 import { ping } from '@/lib/clickhouse/client'
 import type { ConnectionParams } from '@/lib/clickhouse/types'
-
-const STORAGE_KEY = 'chtopo_connection'
+import {
+  clearStoredConnection,
+  loadStoredConnection,
+  saveStoredConnection,
+  toConnectionParams,
+} from '@/lib/connection-storage'
 
 interface ConnectionState {
   host: string
@@ -17,24 +21,6 @@ interface ConnectionState {
   disconnect: () => void
   getParams: () => ConnectionParams
   restoreFromStorage: () => ConnectionParams | null
-}
-
-function loadFromStorage(): Partial<ConnectionParams> | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    return JSON.parse(raw) as Partial<ConnectionParams>
-  } catch {
-    return null
-  }
-}
-
-function saveToStorage(params: ConnectionParams) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(params))
-}
-
-function clearStorage() {
-  localStorage.removeItem(STORAGE_KEY)
 }
 
 export const useConnectionStore = create<ConnectionState>((set, get) => ({
@@ -57,7 +43,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
         isConnecting: false,
         error: null,
       })
-      saveToStorage(params)
+      saveStoredConnection(params)
       return true
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
@@ -67,7 +53,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   },
 
   disconnect: () => {
-    clearStorage()
+    clearStoredConnection()
     set({
       isConnected: false,
       isConnecting: false,
@@ -87,15 +73,9 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   },
 
   restoreFromStorage: () => {
-    const saved = loadFromStorage()
-    if (!saved || !saved.host) return null
-    const params: ConnectionParams = {
-      host: saved.host ?? 'localhost',
-      port: saved.port ?? 8123,
-      database: saved.database ?? 'default',
-      user: saved.user ?? 'default',
-      password: saved.password ?? '',
-    }
+    const saved = loadStoredConnection()
+    if (!saved) return null
+    const params = toConnectionParams(saved)
     set(params)
     return params
   },
