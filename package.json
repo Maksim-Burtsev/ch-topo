@@ -26,11 +26,13 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint src/ --max-warnings 0",
-    "lint:fix": "eslint src/ --fix",
-    "format": "prettier --write src/",
-    "format:check": "prettier --check src/",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "api:build": "tsc -p tsconfig.api.json",
+    "api:start": "node dist-api/main.js",
+    "lint": "eslint src/ api/ --max-warnings 0",
+    "lint:fix": "eslint src/ api/ --fix",
+    "format": "prettier --write src/ api/",
+    "format:check": "prettier --check src/ api/",
+    "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
     "audit": "npm audit --audit-level=moderate",
@@ -41,6 +43,10 @@
   },
   "lint-staged": {
     "src/**/*.{ts,tsx}": [
+      "eslint --fix --max-warnings 0",
+      "prettier --write"
+    ],
+    "api/**/*.ts": [
       "eslint --fix --max-warnings 0",
       "prettier --write"
     ],

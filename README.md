@@ -40,6 +40,17 @@ Open `http://localhost:8080`. Direct Mode still connects from the browser to the
 ClickHouse HTTP interface, so the ClickHouse host must be reachable from the
 user's browser.
 
+## API Service
+
+The API scaffold is available for Server Mode work:
+
+```bash
+npm run api:build
+HOST=127.0.0.1 PORT=4174 npm run api:start
+```
+
+Health check: `GET http://127.0.0.1:4174/api/health`.
+
 ## Direct Mode
 
 Direct Mode requires the target ClickHouse HTTP interface to be reachable from
