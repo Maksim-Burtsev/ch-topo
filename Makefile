@@ -1,4 +1,4 @@
-.PHONY: install dev up down lint lint-fix test check build
+.PHONY: install dev up down lint lint-fix test check build verify
 .DEFAULT_GOAL := dev
 
 install:
@@ -25,7 +25,10 @@ lint-fix:
 test:
 	npm run test
 
-check: lint test
-
 build:
 	npm run build
+
+verify:
+	npm run verify
+
+check: verify
