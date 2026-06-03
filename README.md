@@ -39,7 +39,8 @@ ClickHouse credentials to an untrusted browser.
 
 ## Local Development
 
-Prerequisites: [Node.js](https://nodejs.org/) 20+ and [Docker](https://www.docker.com/).
+Prerequisites: [Node.js](https://nodejs.org/) 20.19+, 22.13+, or 24+, and
+[Docker](https://www.docker.com/). The CI baseline is pinned in `.nvmrc`.
 
 ```bash
 make install    # install dependencies
