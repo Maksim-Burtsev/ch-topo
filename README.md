@@ -45,7 +45,7 @@ Prerequisites: [Node.js](https://nodejs.org/) 20.19+, 22.13+, or 24+, and
 ```bash
 make install    # install dependencies
 make dev        # start ClickHouse in Docker + Vite dev server (http://localhost:5173)
-make check      # run typecheck, lint, format check, and tests
+make check      # run typecheck, lint, format check, tests, and production build
 ```
 
 The UI is designed for desktop/admin workflows. Use a viewport of at least
