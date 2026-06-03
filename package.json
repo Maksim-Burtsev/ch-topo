@@ -33,8 +33,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "audit": "npm audit --audit-level=moderate",
     "check": "npm run typecheck && npm run lint && npm run format:check",
-    "verify": "npm run check && npm run test && npm run build",
+    "verify": "npm run check && npm run audit && npm run test && npm run build",
     "preview": "vite preview",
     "prepare": "husky"
   },
@@ -62,6 +63,11 @@
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.2.2",
     "zustand": "^5.0.13"
+  },
+  "overrides": {
+    "monaco-editor": {
+      "dompurify": "3.4.8"
+    }
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
