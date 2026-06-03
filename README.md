@@ -25,6 +25,19 @@ Open `http://localhost:5173` and connect to the bundled local ClickHouse instanc
 
 `make dev` starts ClickHouse through Docker and then starts the Vite dev server.
 
+## Production Container
+
+Build and run the static SPA image:
+
+```bash
+docker build -t chtopo .
+docker run --rm -p 8080:8080 chtopo
+```
+
+Open `http://localhost:8080`. Direct Mode still connects from the browser to the
+ClickHouse HTTP interface, so the ClickHouse host must be reachable from the
+user's browser.
+
 ## Direct Mode
 
 Direct Mode requires the target ClickHouse HTTP interface to be reachable from
@@ -39,7 +52,7 @@ ClickHouse credentials to an untrusted browser.
 
 ## Local Development
 
-Prerequisites: [Node.js](https://nodejs.org/) 20.19+, 22.13+, or 24+, and
+Prerequisites: [Node.js](https://nodejs.org/) 22.22.1+ or 24+, and
 [Docker](https://www.docker.com/). The CI baseline is pinned in `.nvmrc`.
 
 ```bash
