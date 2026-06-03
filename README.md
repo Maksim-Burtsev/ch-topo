@@ -2,6 +2,8 @@
 
 Interactive schema topology viewer and impact analyzer for ClickHouse.
 
+![chtopo demo schema graph](docs/assets/demo-schema-graph.png)
+
 `chtopo` is currently a local/developer tool. The browser connects directly to the
 ClickHouse HTTP interface, so use it only with trusted local or internal
 ClickHouse instances until Server Mode is available.
