@@ -249,4 +249,65 @@ describe('API service', () => {
     })
     expect(response.status).toBe(502)
   })
+
+  it('returns DDL history for the active server-side session', async () => {
+    sessionStore.create({
+      host: 'clickhouse.local',
+      port: 8123,
+      database: 'analytics',
+      user: 'readonly',
+      password: 'secret',
+    })
+    queryClickHouseRows.mockImplementation(({ sql }) => {
+      if (sql.includes('FROM system.query_log')) {
+        return Promise.resolve([{ event_time: '2026-01-01 00:00:00', query: 'CREATE TABLE x' }])
+      }
+      return Promise.resolve([])
+    })
+
+    const response = await fetch(`${baseUrl}/api/history`, {
+      headers: {
+        Cookie: 'ch_topo_session=session-1',
+      },
+    })
+
+    await expect(response.json()).resolves.toEqual({
+      entries: [{ event_time: '2026-01-01 00:00:00', query: 'CREATE TABLE x' }],
+    })
+    expect(response.status).toBe(200)
+  })
+
+  it('rejects history requests without a valid session cookie', async () => {
+    const response = await fetch(`${baseUrl}/api/history`)
+
+    await expect(response.json()).resolves.toEqual({
+      error: 'Not connected',
+    })
+    expect(response.status).toBe(401)
+    expect(queryClickHouseRows).not.toHaveBeenCalled()
+  })
+
+  it('returns normalized history errors', async () => {
+    sessionStore.create({
+      host: 'clickhouse.local',
+      port: 8123,
+      database: 'analytics',
+      user: 'readonly',
+      password: 'secret',
+    })
+    queryClickHouseRows.mockRejectedValue(
+      new Error('ACCESS_DENIED: Not enough privileges for system.query_log'),
+    )
+
+    const response = await fetch(`${baseUrl}/api/history`, {
+      headers: {
+        Cookie: 'ch_topo_session=session-1',
+      },
+    })
+
+    await expect(response.json()).resolves.toEqual({
+      error: 'DDL history requires SELECT permission on system.query_log.',
+    })
+    expect(response.status).toBe(403)
+  })
 })

@@ -44,6 +44,7 @@ function SkeletonEntry() {
 
 export function HistoryPage() {
   const { status, entries, error, loadHistory } = useHistoryStore()
+  const connectionMode = useConnectionStore((s) => s.mode)
   const selectedDatabase = useDatabaseFilterStore((s) => s.selectedDatabase)
   const setSelectedDatabase = useDatabaseFilterStore((s) => s.setSelectedDatabase)
   const [authorFilter, setAuthorFilter] = useState('')
@@ -138,9 +139,9 @@ export function HistoryPage() {
   useEffect(() => {
     if (status === 'idle') {
       const params = useConnectionStore.getState().getParams()
-      void loadHistory(params)
+      void loadHistory(params, { mode: connectionMode })
     }
-  }, [status, loadHistory])
+  }, [status, connectionMode, loadHistory])
 
   if (status === 'loading') {
     return (

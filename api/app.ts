@@ -2,6 +2,7 @@ import { createServer } from 'node:http'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import { queryClickHouseRows as defaultQueryClickHouseRows } from './clickhouse/client.js'
 import type { BackendClickHouseConnection } from './clickhouse/types.js'
+import { HistoryLoadError, loadHistory } from './history/service.js'
 import { loadSchema } from './schema/service.js'
 import type { SchemaQueryRows } from './schema/types.js'
 import { InMemorySessionStore } from './sessions/store.js'
@@ -200,6 +201,32 @@ async function handleSchema(
   }
 }
 
+async function handleHistory(
+  req: IncomingMessage,
+  res: ServerResponse,
+  sessionStore: InMemorySessionStore,
+  queryRows: SchemaQueryRows,
+) {
+  const connection = getSessionConnection(req, sessionStore)
+
+  if (!connection) {
+    sendJson(res, 401, {
+      error: 'Not connected',
+    })
+    return
+  }
+
+  try {
+    sendJson(res, 200, {
+      entries: await loadHistory(connection, queryRows),
+    })
+  } catch (err) {
+    sendJson(res, err instanceof HistoryLoadError ? err.statusCode : 502, {
+      error: err instanceof Error ? err.message : 'Failed to load DDL history',
+    })
+  }
+}
+
 function handleDisconnect(
   req: IncomingMessage,
   res: ServerResponse,
@@ -251,6 +278,11 @@ export async function handleApiRequest(
 
   if (method === 'GET' && url.pathname === '/api/schema') {
     await handleSchema(req, res, options.sessionStore, options.queryClickHouseRows)
+    return
+  }
+
+  if (method === 'GET' && url.pathname === '/api/history') {
+    await handleHistory(req, res, options.sessionStore, options.queryClickHouseRows)
     return
   }
 
