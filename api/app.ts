@@ -5,6 +5,8 @@ import {
   queryClickHouseRows as defaultQueryClickHouseRows,
 } from './clickhouse/client.js'
 import type { BackendClickHouseConnection } from './clickhouse/types.js'
+import { explainQuery } from './explain/service.js'
+import type { ExplainMode, ExplainRequestPayload } from './explain/types.js'
 import { HistoryLoadError, loadHistory } from './history/service.js'
 import { executeQuery, QueryExecutionError } from './query/service.js'
 import type { ClickHouseExecute, QueryRequestPayload } from './query/types.js'
@@ -86,6 +88,10 @@ function optionalPositiveInteger(value: unknown): value is number | undefined {
   return value === undefined || (Number.isInteger(value) && typeof value === 'number' && value > 0)
 }
 
+function isExplainMode(value: unknown): value is ExplainMode | undefined {
+  return value === undefined || value === 'plan' || value === 'pipeline' || value === 'syntax'
+}
+
 function parseConnectionPayload(value: unknown): BackendClickHouseConnection | undefined {
   if (!isRecord(value)) return undefined
 
@@ -132,6 +138,22 @@ function parseQueryPayload(value: unknown): QueryRequestPayload | undefined {
     timeoutMs,
     maxRows,
     maxBytes,
+  }
+}
+
+function parseExplainPayload(value: unknown): ExplainRequestPayload | undefined {
+  if (!isRecord(value)) return undefined
+
+  const { sql, mode, timeoutMs } = value
+
+  if (!nonEmptyString(sql) || !isExplainMode(mode) || !optionalPositiveInteger(timeoutMs)) {
+    return undefined
+  }
+
+  return {
+    sql,
+    mode,
+    timeoutMs,
   }
 }
 
@@ -335,6 +357,82 @@ async function handleQuery(
   }
 }
 
+async function handleExplain(
+  req: IncomingMessage,
+  res: ServerResponse,
+  sessionStore: InMemorySessionStore,
+  execute: ClickHouseExecute,
+) {
+  const connection = getSessionConnection(req, sessionStore)
+
+  if (!connection) {
+    sendJson(res, 401, {
+      error: {
+        message: 'Not connected',
+        statusCode: 401,
+      },
+    })
+    return
+  }
+
+  let payload: unknown
+
+  try {
+    payload = await readJsonBody(req)
+  } catch {
+    sendJson(res, 400, {
+      error: {
+        message: 'Invalid JSON request body',
+        statusCode: 400,
+      },
+    })
+    return
+  }
+
+  const explainPayload = parseExplainPayload(payload)
+
+  if (!explainPayload) {
+    sendJson(res, 400, {
+      error: {
+        message: 'Invalid explain payload',
+        statusCode: 400,
+      },
+    })
+    return
+  }
+
+  const controller = new AbortController()
+  const abort = () => {
+    if (!res.writableEnded) {
+      controller.abort()
+    }
+  }
+
+  req.on('aborted', abort)
+  res.on('close', abort)
+
+  try {
+    sendJson(res, 200, await explainQuery(connection, explainPayload, execute, controller.signal))
+  } catch (err) {
+    if (err instanceof QueryExecutionError) {
+      sendJson(res, err.payload.statusCode, {
+        error: err.payload,
+      })
+      return
+    }
+
+    sendJson(res, 502, {
+      error: {
+        message: err instanceof Error ? err.message : 'Failed to explain query',
+        statusCode: 502,
+      },
+    })
+  } finally {
+    req.off('aborted', abort)
+    res.off('close', abort)
+  }
+}
+
 function handleDisconnect(
   req: IncomingMessage,
   res: ServerResponse,
@@ -396,6 +494,11 @@ export async function handleApiRequest(
 
   if (method === 'POST' && url.pathname === '/api/query') {
     await handleQuery(req, res, options.sessionStore, options.executeClickHouseRequest)
+    return
+  }
+
+  if (method === 'POST' && url.pathname === '/api/explain') {
+    await handleExplain(req, res, options.sessionStore, options.executeClickHouseRequest)
     return
   }
 

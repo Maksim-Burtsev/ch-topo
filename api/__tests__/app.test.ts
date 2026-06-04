@@ -404,4 +404,67 @@ describe('API service', () => {
     })
     expect(response.status).toBe(502)
   })
+
+  it('executes explain requests for the active server-side session', async () => {
+    sessionStore.create({
+      host: 'clickhouse.local',
+      port: 8123,
+      database: 'analytics',
+      user: 'readonly',
+      password: 'secret',
+    })
+    executeClickHouseRequest.mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: 'ReadFromMergeTree',
+    })
+
+    const response = await fetch(`${baseUrl}/api/explain`, {
+      method: 'POST',
+      headers: {
+        Cookie: 'ch_topo_session=session-1',
+      },
+      body: JSON.stringify({
+        sql: 'SELECT * FROM events',
+        mode: 'pipeline',
+        timeoutMs: 1_000,
+      }),
+    })
+
+    await expect(response.json()).resolves.toEqual({
+      mode: 'pipeline',
+      text: 'ReadFromMergeTree',
+    })
+    expect(response.status).toBe(200)
+    expect(executeClickHouseRequest.mock.calls[0]?.[0].sql).toContain('EXPLAIN PIPELINE')
+  })
+
+  it('returns consistent explain errors', async () => {
+    sessionStore.create({
+      host: 'clickhouse.local',
+      port: 8123,
+      database: 'analytics',
+      user: 'readonly',
+      password: 'secret',
+    })
+    executeClickHouseRequest.mockRejectedValue(new Error('explain failed'))
+
+    const response = await fetch(`${baseUrl}/api/explain`, {
+      method: 'POST',
+      headers: {
+        Cookie: 'ch_topo_session=session-1',
+      },
+      body: JSON.stringify({
+        sql: 'SELECT 1',
+      }),
+    })
+
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        message: 'explain failed',
+        statusCode: 502,
+      },
+    })
+    expect(response.status).toBe(502)
+  })
 })
