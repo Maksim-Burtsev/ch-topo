@@ -957,8 +957,8 @@ function GraphPageInner() {
   }, [])
 
   const handleRefresh = useCallback(() => {
-    if (schemaStatus === 'loading' || connectionMode === 'server') return
-    void loadSchema(getParams())
+    if (schemaStatus === 'loading') return
+    void loadSchema(getParams(), { mode: connectionMode })
   }, [schemaStatus, connectionMode, loadSchema, getParams])
 
   // Resolve selected dictionary first — dictionaries also exist in system.tables
