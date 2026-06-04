@@ -48,6 +48,7 @@ describe('schema service', () => {
       dictionaries: [{ database: 'analytics', name: 'geo_dict' }],
       rowPolicies: [{ database: 'analytics', table: 'events', name: 'tenant_filter' }],
       grants: [{ user_name: 'readonly', database: 'analytics', table: 'events' }],
+      warnings: [],
     })
     expect(queryRowsSpy).toHaveBeenCalledTimes(6)
     expect(
@@ -56,5 +57,50 @@ describe('schema service', () => {
           request.connection === connection && request.sql.includes('FROM system.tables'),
       ),
     ).toBe(true)
+  })
+
+  it('returns warnings and empty rows when optional collections fail', async () => {
+    const queryRows: SchemaQueryRows = <T>({ sql }: SchemaQueryRequest) => {
+      if (sql.includes('FROM system.tables')) {
+        return Promise.resolve([{ database: 'analytics', name: 'events' }] as T[])
+      }
+      if (sql.includes('FROM system.columns')) {
+        return Promise.resolve([
+          { database: 'analytics', table: 'events', name: 'event_id' },
+        ] as T[])
+      }
+      if (sql.includes('FROM system.data_skipping_indices')) {
+        return Promise.reject(new Error('indices denied'))
+      }
+      if (sql.includes('FROM system.row_policies')) {
+        return Promise.reject(new Error('row policies denied'))
+      }
+      return Promise.resolve([])
+    }
+
+    await expect(loadSchema(connection, queryRows)).resolves.toMatchObject({
+      tables: [{ database: 'analytics', name: 'events' }],
+      columns: [{ database: 'analytics', table: 'events', name: 'event_id' }],
+      indices: [],
+      rowPolicies: [],
+      warnings: [
+        { source: 'indices', message: 'indices denied' },
+        { source: 'rowPolicies', message: 'row policies denied' },
+      ],
+    })
+  })
+
+  it('fails when critical tables or columns cannot be loaded', async () => {
+    const queryRows: SchemaQueryRows = <T>({ sql }: SchemaQueryRequest) => {
+      if (sql.includes('FROM system.tables')) {
+        return Promise.resolve([] as T[])
+      }
+      if (sql.includes('FROM system.columns')) {
+        return Promise.reject(new Error('columns denied'))
+      }
+      return Promise.resolve([] as T[])
+    }
+
+    await expect(loadSchema(connection, queryRows)).rejects.toThrow('columns denied')
   })
 })

@@ -209,6 +209,7 @@ describe('API service', () => {
       dictionaries: [],
       rowPolicies: [],
       grants: [],
+      warnings: [],
     })
     expect(response.status).toBe(200)
     const tablesCall = queryClickHouseRows.mock.calls.find(([request]) =>
