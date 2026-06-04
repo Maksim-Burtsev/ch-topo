@@ -41,7 +41,7 @@ export function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
   const title = getPageTitle(location.pathname)
-  const { host, port, isConnected, disconnect } = useConnectionStore()
+  const { host, port, isConnected, disconnect, mode } = useConnectionStore()
   const schemaStatus = useSchemaStore((s) => s.status)
   const restoreAttempted = useRef(false)
 
@@ -68,11 +68,11 @@ export function Layout() {
 
   // Trigger schema loading when connected but schema not yet loaded
   useEffect(() => {
-    if (isConnected && schemaStatus === 'idle') {
+    if (isConnected && mode === 'direct' && schemaStatus === 'idle') {
       const params = useConnectionStore.getState().getParams()
       void useSchemaStore.getState().loadSchema(params)
     }
-  }, [isConnected, schemaStatus])
+  }, [isConnected, mode, schemaStatus])
 
   // Document title
   useEffect(() => {
@@ -112,12 +112,13 @@ export function Layout() {
   const displayHost = `${host}:${port}`
 
   function handleDisconnect() {
-    disconnect()
-    useSchemaStore.getState().reset()
-    useGraphStore.getState().reset()
-    useHistoryStore.getState().reset()
-    useDatabaseFilterStore.getState().setSelectedDatabase('')
-    void navigate('/connect')
+    void disconnect().finally(() => {
+      useSchemaStore.getState().reset()
+      useGraphStore.getState().reset()
+      useHistoryStore.getState().reset()
+      useDatabaseFilterStore.getState().setSelectedDatabase('')
+      void navigate('/connect')
+    })
   }
 
   const { theme, toggle: toggleTheme } = useThemeStore()
@@ -195,6 +196,9 @@ export function Layout() {
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+            </span>
+            <span className="rounded border border-border px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
+              {mode === 'server' ? 'Server' : 'Direct'}
             </span>
             {displayHost}
           </div>

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { connectServerMode, disconnectServerMode } from '@/lib/api/connection'
 import { ping } from '@/lib/clickhouse/client'
 import type { ConnectionParams } from '@/lib/clickhouse/types'
 import {
@@ -8,17 +9,24 @@ import {
   toConnectionParams,
 } from '@/lib/connection-storage'
 
+export type ConnectionMode = 'direct' | 'server'
+
+interface ConnectOptions {
+  mode?: ConnectionMode
+}
+
 interface ConnectionState {
   host: string
   port: number
   database: string
   user: string
   password: string
+  mode: ConnectionMode
   isConnected: boolean
   isConnecting: boolean
   error: string | null
-  connect: (params: ConnectionParams) => Promise<boolean>
-  disconnect: () => void
+  connect: (params: ConnectionParams, options?: ConnectOptions) => Promise<boolean>
+  disconnect: () => Promise<void>
   getParams: () => ConnectionParams
   restoreFromStorage: () => ConnectionParams | null
 }
@@ -29,36 +37,63 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   database: 'default',
   user: 'default',
   password: '',
+  mode: 'direct',
   isConnected: false,
   isConnecting: false,
   error: null,
 
-  connect: async (params: ConnectionParams) => {
+  connect: async (params: ConnectionParams, options: ConnectOptions = {}) => {
+    const mode = options.mode ?? 'direct'
     set({ isConnecting: true, error: null })
+
     try {
-      await ping(params)
+      if (mode === 'server') {
+        await connectServerMode(params)
+      } else {
+        await ping(params)
+      }
+
+      const stateParams = mode === 'server' ? { ...params, password: '' } : params
+
       set({
-        ...params,
+        ...stateParams,
+        mode,
         isConnected: true,
         isConnecting: false,
         error: null,
       })
-      saveStoredConnection(params)
+      saveStoredConnection(stateParams)
       return true
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
-      set({ isConnecting: false, error: message, isConnected: false })
+      set({
+        isConnecting: false,
+        error: message,
+        isConnected: false,
+        password: mode === 'server' ? '' : get().password,
+      })
       return false
     }
   },
 
-  disconnect: () => {
+  disconnect: async () => {
+    const wasServerMode = get().mode === 'server'
     clearStoredConnection()
     set({
       isConnected: false,
       isConnecting: false,
       error: null,
+      password: '',
     })
+
+    if (wasServerMode) {
+      try {
+        await disconnectServerMode()
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to disconnect server session'
+        set({ error: message })
+      }
+    }
   },
 
   getParams: () => {
@@ -76,7 +111,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
     const saved = loadStoredConnection()
     if (!saved) return null
     const params = toConnectionParams(saved)
-    set(params)
+    set({ ...params, mode: 'direct' })
     return params
   },
 }))
