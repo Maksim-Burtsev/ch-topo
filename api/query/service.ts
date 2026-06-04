@@ -54,7 +54,7 @@ function buildLimitedSql(payload: QueryRequestPayload) {
   return `${sql} SETTINGS max_result_rows = ${maxRows}, max_result_bytes = ${maxBytes}, result_overflow_mode = 'break'`
 }
 
-function normalizeQueryError(err: unknown): QueryExecutionError {
+export function normalizeQueryError(err: unknown): QueryExecutionError {
   if (err instanceof BackendClickHouseError) {
     return new QueryExecutionError({
       message: err.message,
