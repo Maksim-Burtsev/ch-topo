@@ -1,8 +1,13 @@
 import { createServer } from 'node:http'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
-import { queryClickHouseRows as defaultQueryClickHouseRows } from './clickhouse/client.js'
+import {
+  executeClickHouseRequest as defaultExecuteClickHouseRequest,
+  queryClickHouseRows as defaultQueryClickHouseRows,
+} from './clickhouse/client.js'
 import type { BackendClickHouseConnection } from './clickhouse/types.js'
 import { HistoryLoadError, loadHistory } from './history/service.js'
+import { executeQuery, QueryExecutionError } from './query/service.js'
+import type { ClickHouseExecute, QueryRequestPayload } from './query/types.js'
 import { loadSchema } from './schema/service.js'
 import type { SchemaQueryRows } from './schema/types.js'
 import { InMemorySessionStore } from './sessions/store.js'
@@ -14,6 +19,7 @@ export interface ApiServerOptions {
   sessionStore?: InMemorySessionStore
   pingClickHouse?: (connection: BackendClickHouseConnection) => Promise<void>
   queryClickHouseRows?: SchemaQueryRows
+  executeClickHouseRequest?: ClickHouseExecute
   sessionCleanupIntervalMs?: number | false
 }
 
@@ -76,6 +82,10 @@ function optionalString(value: unknown): value is string | undefined {
   return value === undefined || typeof value === 'string'
 }
 
+function optionalPositiveInteger(value: unknown): value is number | undefined {
+  return value === undefined || (Number.isInteger(value) && typeof value === 'number' && value > 0)
+}
+
 function parseConnectionPayload(value: unknown): BackendClickHouseConnection | undefined {
   if (!isRecord(value)) return undefined
 
@@ -100,6 +110,28 @@ function parseConnectionPayload(value: unknown): BackendClickHouseConnection | u
     database,
     user,
     password: password ?? '',
+  }
+}
+
+function parseQueryPayload(value: unknown): QueryRequestPayload | undefined {
+  if (!isRecord(value)) return undefined
+
+  const { sql, timeoutMs, maxRows, maxBytes } = value
+
+  if (
+    !nonEmptyString(sql) ||
+    !optionalPositiveInteger(timeoutMs) ||
+    !optionalPositiveInteger(maxRows) ||
+    !optionalPositiveInteger(maxBytes)
+  ) {
+    return undefined
+  }
+
+  return {
+    sql,
+    timeoutMs,
+    maxRows,
+    maxBytes,
   }
 }
 
@@ -227,6 +259,82 @@ async function handleHistory(
   }
 }
 
+async function handleQuery(
+  req: IncomingMessage,
+  res: ServerResponse,
+  sessionStore: InMemorySessionStore,
+  execute: ClickHouseExecute,
+) {
+  const connection = getSessionConnection(req, sessionStore)
+
+  if (!connection) {
+    sendJson(res, 401, {
+      error: {
+        message: 'Not connected',
+        statusCode: 401,
+      },
+    })
+    return
+  }
+
+  let payload: unknown
+
+  try {
+    payload = await readJsonBody(req)
+  } catch {
+    sendJson(res, 400, {
+      error: {
+        message: 'Invalid JSON request body',
+        statusCode: 400,
+      },
+    })
+    return
+  }
+
+  const queryPayload = parseQueryPayload(payload)
+
+  if (!queryPayload) {
+    sendJson(res, 400, {
+      error: {
+        message: 'Invalid query payload',
+        statusCode: 400,
+      },
+    })
+    return
+  }
+
+  const controller = new AbortController()
+  const abort = () => {
+    if (!res.writableEnded) {
+      controller.abort()
+    }
+  }
+
+  req.on('aborted', abort)
+  res.on('close', abort)
+
+  try {
+    sendJson(res, 200, await executeQuery(connection, queryPayload, execute, controller.signal))
+  } catch (err) {
+    if (err instanceof QueryExecutionError) {
+      sendJson(res, err.payload.statusCode, {
+        error: err.payload,
+      })
+      return
+    }
+
+    sendJson(res, 502, {
+      error: {
+        message: err instanceof Error ? err.message : 'Failed to execute query',
+        statusCode: 502,
+      },
+    })
+  } finally {
+    req.off('aborted', abort)
+    res.off('close', abort)
+  }
+}
+
 function handleDisconnect(
   req: IncomingMessage,
   res: ServerResponse,
@@ -286,6 +394,11 @@ export async function handleApiRequest(
     return
   }
 
+  if (method === 'POST' && url.pathname === '/api/query') {
+    await handleQuery(req, res, options.sessionStore, options.executeClickHouseRequest)
+    return
+  }
+
   sendJson(res, 404, {
     error: 'Not found',
   })
@@ -296,6 +409,7 @@ export function createApiServer(options: ApiServerOptions = {}): Server {
     sessionStore: options.sessionStore ?? new InMemorySessionStore(),
     pingClickHouse: options.pingClickHouse ?? defaultPingClickHouse,
     queryClickHouseRows: options.queryClickHouseRows ?? defaultQueryClickHouseRows,
+    executeClickHouseRequest: options.executeClickHouseRequest ?? defaultExecuteClickHouseRequest,
     sessionCleanupIntervalMs: options.sessionCleanupIntervalMs ?? 60_000,
   }
 
