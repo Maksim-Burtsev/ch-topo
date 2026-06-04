@@ -746,6 +746,7 @@ function GraphPageInner() {
   const schemaStatus = useSchemaStore((s) => s.status)
   const loadSchema = useSchemaStore((s) => s.loadSchema)
   const getParams = useConnectionStore((s) => s.getParams)
+  const connectionMode = useConnectionStore((s) => s.mode)
   const graph = useGraphStore((s) => s.graph)
   const theme = useThemeStore((s) => s.theme)
   const { fitView, setViewport } = useReactFlow()
@@ -956,9 +957,9 @@ function GraphPageInner() {
   }, [])
 
   const handleRefresh = useCallback(() => {
-    if (schemaStatus === 'loading') return
+    if (schemaStatus === 'loading' || connectionMode === 'server') return
     void loadSchema(getParams())
-  }, [schemaStatus, loadSchema, getParams])
+  }, [schemaStatus, connectionMode, loadSchema, getParams])
 
   // Resolve selected dictionary first — dictionaries also exist in system.tables
   // with engine='Dictionary', so we need to check dictionaries before tables.

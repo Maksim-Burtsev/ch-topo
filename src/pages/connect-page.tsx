@@ -1,9 +1,10 @@
-import { Database, Loader2 } from 'lucide-react'
+import { Cable, Database, Loader2, ShieldCheck } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { loadStoredConnection, toConnectionParams } from '@/lib/connection-storage'
+import type { ConnectionMode } from '@/stores/connection-store'
 import { useConnectionStore } from '@/stores/connection-store'
 import { useSchemaStore } from '@/stores/schema-store'
 
@@ -11,6 +12,7 @@ export function ConnectPage() {
   const navigate = useNavigate()
   const { isConnecting, error, connect } = useConnectionStore()
   const [saved] = useState(() => loadStoredConnection())
+  const [connectionMode, setConnectionMode] = useState<ConnectionMode>('server')
 
   const [host, setHost] = useState(saved?.host ?? 'localhost')
   const [port, setPort] = useState(String(saved?.port ?? 8123))
@@ -18,6 +20,8 @@ export function ConnectPage() {
   const [user, setUser] = useState(saved?.user ?? 'default')
   const [password, setPassword] = useState('')
   const autoConnectRef = useRef(false)
+  const connectButtonLabel =
+    connectionMode === 'server' ? 'Connect via Server Mode' : 'Connect via Direct Mode'
 
   useEffect(() => {
     if (autoConnectRef.current) return
@@ -25,7 +29,7 @@ export function ConnectPage() {
 
     if (saved) {
       const params = toConnectionParams(saved)
-      void connect(params).then((ok) => {
+      void connect(params, { mode: 'direct' }).then((ok) => {
         if (ok) {
           void useSchemaStore.getState().loadSchema(params)
           void navigate('/')
@@ -43,9 +47,13 @@ export function ConnectPage() {
       user,
       password,
     }
-    void connect(params).then((ok) => {
+    void connect(params, { mode: connectionMode }).then((ok) => {
       if (ok) {
-        void useSchemaStore.getState().loadSchema(params)
+        if (connectionMode === 'direct') {
+          void useSchemaStore.getState().loadSchema(params)
+        } else {
+          useSchemaStore.getState().reset()
+        }
         void navigate('/')
       }
     })
@@ -60,16 +68,56 @@ export function ConnectPage() {
           </div>
           <h1 className="text-xl font-semibold">Connect to ClickHouse</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Direct HTTP connection to your ClickHouse instance
+            {connectionMode === 'server'
+              ? 'Server-side session through the ch-topo API'
+              : 'Direct HTTP connection from this browser'}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs leading-relaxed text-amber-700 dark:text-amber-200">
-            Direct Mode is for local or trusted internal ClickHouse only. The browser sends
-            credentials directly to ClickHouse; passwords are used for this session and are never
-            saved.
+          <div className="grid grid-cols-2 rounded-lg border border-border bg-card p-1">
+            <button
+              type="button"
+              onClick={() => {
+                setConnectionMode('server')
+              }}
+              className={`flex h-9 items-center justify-center gap-2 rounded-md text-xs transition-colors ${
+                connectionMode === 'server'
+                  ? 'bg-accent text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <ShieldCheck size={14} />
+              Server Mode
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setConnectionMode('direct')
+              }}
+              className={`flex h-9 items-center justify-center gap-2 rounded-md text-xs transition-colors ${
+                connectionMode === 'direct'
+                  ? 'bg-accent text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Cable size={14} />
+              Direct Mode
+            </button>
           </div>
+
+          {connectionMode === 'server' ? (
+            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs leading-relaxed text-emerald-700 dark:text-emerald-200">
+              Server Mode stores ClickHouse credentials only in the ch-topo API session. The browser
+              receives an httpOnly session cookie.
+            </div>
+          ) : (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs leading-relaxed text-amber-700 dark:text-amber-200">
+              Direct Mode is for local or trusted internal ClickHouse only. The browser sends
+              credentials directly to ClickHouse; passwords are used for this session and are never
+              saved.
+            </div>
+          )}
 
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2">
@@ -141,19 +189,21 @@ export function ConnectPage() {
                 Connecting...
               </>
             ) : (
-              'Connect'
+              connectButtonLabel
             )}
           </Button>
         </form>
 
-        <p className="mt-6 text-center text-xs text-muted-foreground leading-relaxed">
-          Requires ClickHouse HTTP interface on the specified port.
-          <br />
-          CORS must be enabled:{' '}
-          <code className="rounded bg-muted px-1 py-0.5 text-[10px]">
-            {'<allow_origin>*</allow_origin>'}
-          </code>
-        </p>
+        {connectionMode === 'direct' && (
+          <p className="mt-6 text-center text-xs text-muted-foreground leading-relaxed">
+            Requires ClickHouse HTTP interface on the specified port.
+            <br />
+            CORS must be enabled:{' '}
+            <code className="rounded bg-muted px-1 py-0.5 text-[10px]">
+              {'<allow_origin>*</allow_origin>'}
+            </code>
+          </p>
+        )}
       </div>
     </div>
   )
