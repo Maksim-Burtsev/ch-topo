@@ -69,6 +69,12 @@ export interface SchemaPayload {
   dictionaries: RawDictionaryRow[]
   rowPolicies: RawRowPolicyRow[]
   grants: RawGrantRow[]
+  warnings: SchemaWarning[]
+}
+
+export interface SchemaWarning {
+  source: 'indices' | 'dictionaries' | 'rowPolicies' | 'grants'
+  message: string
 }
 
 export interface SchemaQueryRequest {

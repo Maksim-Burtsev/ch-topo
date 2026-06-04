@@ -43,6 +43,7 @@ export function Layout() {
   const title = getPageTitle(location.pathname)
   const { host, port, isConnected, disconnect, mode } = useConnectionStore()
   const schemaStatus = useSchemaStore((s) => s.status)
+  const schemaWarnings = useSchemaStore((s) => s.warnings)
   const restoreAttempted = useRef(false)
 
   // Auto-reconnect from localStorage on page load
@@ -192,6 +193,14 @@ export function Layout() {
                 </div>
                 <span className="text-muted-foreground/60">Loading schema...</span>
               </div>
+            )}
+            {schemaWarnings.length > 0 && (
+              <span
+                className="rounded border border-amber-500/40 px-1.5 py-0.5 text-[10px] uppercase text-amber-600 dark:text-amber-300"
+                title={schemaWarnings.map((warning) => warning.message).join('\n')}
+              >
+                {schemaWarnings.length} warnings
+              </span>
             )}
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />

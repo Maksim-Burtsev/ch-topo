@@ -19,6 +19,11 @@ import type {
 
 type SchemaStatus = 'idle' | 'loading' | 'ready' | 'error'
 
+export interface SchemaWarning {
+  source: 'indices' | 'dictionaries' | 'rowPolicies' | 'grants'
+  message: string
+}
+
 interface SchemaState {
   status: SchemaStatus
   error: string | null
@@ -29,6 +34,7 @@ interface SchemaState {
   dictionaries: RawDictionaryRow[]
   rowPolicies: RawRowPolicyRow[]
   grants: RawGrantRow[]
+  warnings: SchemaWarning[]
 
   tablesReady: boolean
   columnsReady: boolean
@@ -46,6 +52,7 @@ export const useSchemaStore = create<SchemaState>((set) => ({
   dictionaries: [],
   rowPolicies: [],
   grants: [],
+  warnings: [],
   tablesReady: false,
   columnsReady: false,
 
@@ -59,6 +66,7 @@ export const useSchemaStore = create<SchemaState>((set) => ({
       dictionaries: [],
       rowPolicies: [],
       grants: [],
+      warnings: [],
       tablesReady: false,
       columnsReady: false,
     })
@@ -81,7 +89,14 @@ export const useSchemaStore = create<SchemaState>((set) => ({
       const policiesPromise = fetchRowPolicies(params)
       const grantsPromise = fetchGrants(params)
 
-      const [, , indices, dictionaries, rowPolicies, grants] = await Promise.all([
+      const [
+        tablesResult,
+        columnsResult,
+        indicesResult,
+        dictionariesResult,
+        policiesResult,
+        grantsResult,
+      ] = await Promise.allSettled([
         tablesPromise,
         columnsPromise,
         indicesPromise,
@@ -89,12 +104,17 @@ export const useSchemaStore = create<SchemaState>((set) => ({
         policiesPromise,
         grantsPromise,
       ])
+      const warnings: SchemaWarning[] = []
+
+      if (tablesResult.status === 'rejected') throw tablesResult.reason
+      if (columnsResult.status === 'rejected') throw columnsResult.reason
 
       set({
-        indices,
-        dictionaries,
-        rowPolicies,
-        grants,
+        indices: optionalRows('indices', indicesResult, warnings),
+        dictionaries: optionalRows('dictionaries', dictionariesResult, warnings),
+        rowPolicies: optionalRows('rowPolicies', policiesResult, warnings),
+        grants: optionalRows('grants', grantsResult, warnings),
+        warnings,
         status: 'ready',
       })
     } catch (err) {
@@ -113,8 +133,27 @@ export const useSchemaStore = create<SchemaState>((set) => ({
       dictionaries: [],
       rowPolicies: [],
       grants: [],
+      warnings: [],
       tablesReady: false,
       columnsReady: false,
     })
   },
 }))
+
+function getErrorMessage(reason: unknown) {
+  return reason instanceof Error ? reason.message : 'Failed to load optional schema metadata'
+}
+
+function optionalRows<T>(
+  source: SchemaWarning['source'],
+  result: PromiseSettledResult<T[]>,
+  warnings: SchemaWarning[],
+): T[] {
+  if (result.status === 'fulfilled') return result.value
+
+  warnings.push({
+    source,
+    message: getErrorMessage(result.reason),
+  })
+  return []
+}
