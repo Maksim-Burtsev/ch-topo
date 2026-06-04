@@ -3,7 +3,11 @@ import type { AddressInfo } from 'node:net'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MockedFunction } from 'vitest'
 import { createApiServer } from '../app.js'
-import type { BackendClickHouseConnection } from '../clickhouse/types.js'
+import type {
+  BackendClickHouseConnection,
+  BackendClickHouseResponse,
+  BackendClickHouseResponseFormat,
+} from '../clickhouse/types.js'
 import { InMemorySessionStore } from '../sessions/store.js'
 
 type PingClickHouse = (connection: BackendClickHouseConnection) => Promise<void>
@@ -11,12 +15,20 @@ type QueryRows = (request: {
   connection: BackendClickHouseConnection
   sql: string
 }) => Promise<unknown[]>
+type ExecuteClickHouse = (request: {
+  connection: BackendClickHouseConnection
+  sql: string
+  format?: BackendClickHouseResponseFormat
+  timeoutMs?: number
+  signal?: AbortSignal
+}) => Promise<BackendClickHouseResponse>
 
 let server: Server
 let baseUrl: string
 let sessionStore: InMemorySessionStore
 let pingClickHouse: MockedFunction<PingClickHouse>
 let queryClickHouseRows: MockedFunction<QueryRows>
+let executeClickHouseRequest: MockedFunction<ExecuteClickHouse>
 
 function listen(serverToStart: Server): Promise<void> {
   return new Promise((resolve) => {
@@ -49,10 +61,21 @@ describe('API service', () => {
     })
     pingClickHouse = vi.fn<PingClickHouse>().mockResolvedValue(undefined)
     queryClickHouseRows = vi.fn<QueryRows>().mockResolvedValue([])
+    executeClickHouseRequest = vi.fn<ExecuteClickHouse>().mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: JSON.stringify({
+        meta: [],
+        data: [],
+        rows: 0,
+        statistics: { elapsed: 0, rows_read: 0, bytes_read: 0 },
+      }),
+    })
     server = createApiServer({
       sessionStore,
       pingClickHouse,
       queryClickHouseRows,
+      executeClickHouseRequest,
       sessionCleanupIntervalMs: false,
     })
     await listen(server)
@@ -309,5 +332,76 @@ describe('API service', () => {
       error: 'DDL history requires SELECT permission on system.query_log.',
     })
     expect(response.status).toBe(403)
+  })
+
+  it('executes query requests for the active server-side session', async () => {
+    sessionStore.create({
+      host: 'clickhouse.local',
+      port: 8123,
+      database: 'analytics',
+      user: 'readonly',
+      password: 'secret',
+    })
+    executeClickHouseRequest.mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: JSON.stringify({
+        meta: [{ name: 'id', type: 'UInt64' }],
+        data: [{ id: 1 }],
+        rows: 1,
+        statistics: { elapsed: 0.05, rows_read: 10, bytes_read: 200 },
+      }),
+    })
+
+    const response = await fetch(`${baseUrl}/api/query`, {
+      method: 'POST',
+      headers: {
+        Cookie: 'ch_topo_session=session-1',
+      },
+      body: JSON.stringify({
+        sql: 'SELECT id FROM events',
+        timeoutMs: 1_000,
+        maxRows: 100,
+      }),
+    })
+
+    await expect(response.json()).resolves.toEqual({
+      columns: [{ name: 'id', type: 'UInt64' }],
+      rows: [{ id: 1 }],
+      elapsed: 0.05,
+      rowsRead: 10,
+      bytesRead: 200,
+    })
+    expect(response.status).toBe(200)
+    expect(executeClickHouseRequest.mock.calls[0]?.[0].connection.password).toBe('secret')
+  })
+
+  it('returns consistent query errors', async () => {
+    sessionStore.create({
+      host: 'clickhouse.local',
+      port: 8123,
+      database: 'analytics',
+      user: 'readonly',
+      password: 'secret',
+    })
+    executeClickHouseRequest.mockRejectedValue(new Error('boom'))
+
+    const response = await fetch(`${baseUrl}/api/query`, {
+      method: 'POST',
+      headers: {
+        Cookie: 'ch_topo_session=session-1',
+      },
+      body: JSON.stringify({
+        sql: 'SELECT 1',
+      }),
+    })
+
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        message: 'boom',
+        statusCode: 502,
+      },
+    })
+    expect(response.status).toBe(502)
   })
 })
