@@ -69,9 +69,9 @@ export function Layout() {
 
   // Trigger schema loading when connected but schema not yet loaded
   useEffect(() => {
-    if (isConnected && mode === 'direct' && schemaStatus === 'idle') {
+    if (isConnected && schemaStatus === 'idle') {
       const params = useConnectionStore.getState().getParams()
-      void useSchemaStore.getState().loadSchema(params)
+      void useSchemaStore.getState().loadSchema(params, { mode })
     }
   }, [isConnected, mode, schemaStatus])
 

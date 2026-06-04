@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { fetchServerSchema } from '@/lib/api/schema'
 import {
   fetchTables,
   fetchColumns,
@@ -16,6 +17,7 @@ import type {
   RawRowPolicyRow,
   RawGrantRow,
 } from '@/lib/clickhouse/types'
+import type { ConnectionMode } from './connection-store'
 
 type SchemaStatus = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -39,8 +41,12 @@ interface SchemaState {
   tablesReady: boolean
   columnsReady: boolean
 
-  loadSchema: (params: ConnectionParams) => Promise<void>
+  loadSchema: (params: ConnectionParams, options?: LoadSchemaOptions) => Promise<void>
   reset: () => void
+}
+
+interface LoadSchemaOptions {
+  mode?: ConnectionMode
 }
 
 export const useSchemaStore = create<SchemaState>((set) => ({
@@ -56,7 +62,9 @@ export const useSchemaStore = create<SchemaState>((set) => ({
   tablesReady: false,
   columnsReady: false,
 
-  loadSchema: async (params: ConnectionParams) => {
+  loadSchema: async (params: ConnectionParams, options: LoadSchemaOptions = {}) => {
+    const mode = options.mode ?? 'direct'
+
     set({
       status: 'loading',
       error: null,
@@ -72,6 +80,17 @@ export const useSchemaStore = create<SchemaState>((set) => ({
     })
 
     try {
+      if (mode === 'server') {
+        const schema = await fetchServerSchema()
+        set({
+          ...schema,
+          tablesReady: true,
+          columnsReady: true,
+          status: 'ready',
+        })
+        return
+      }
+
       // Fire all queries in parallel.
       // system.tables is critical path — save it as soon as it resolves.
       const tablesPromise = fetchTables(params).then((rows) => {

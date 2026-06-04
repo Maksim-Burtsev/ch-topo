@@ -50,9 +50,9 @@ export function ConnectPage() {
     void connect(params, { mode: connectionMode }).then((ok) => {
       if (ok) {
         if (connectionMode === 'direct') {
-          void useSchemaStore.getState().loadSchema(params)
+          void useSchemaStore.getState().loadSchema(params, { mode: 'direct' })
         } else {
-          useSchemaStore.getState().reset()
+          void useSchemaStore.getState().loadSchema(params, { mode: 'server' })
         }
         void navigate('/')
       }
