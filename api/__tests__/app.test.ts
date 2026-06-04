@@ -7,11 +7,16 @@ import type { BackendClickHouseConnection } from '../clickhouse/types.js'
 import { InMemorySessionStore } from '../sessions/store.js'
 
 type PingClickHouse = (connection: BackendClickHouseConnection) => Promise<void>
+type QueryRows = (request: {
+  connection: BackendClickHouseConnection
+  sql: string
+}) => Promise<unknown[]>
 
 let server: Server
 let baseUrl: string
 let sessionStore: InMemorySessionStore
 let pingClickHouse: MockedFunction<PingClickHouse>
+let queryClickHouseRows: MockedFunction<QueryRows>
 
 function listen(serverToStart: Server): Promise<void> {
   return new Promise((resolve) => {
@@ -43,9 +48,11 @@ describe('API service', () => {
       idGenerator: () => 'session-1',
     })
     pingClickHouse = vi.fn<PingClickHouse>().mockResolvedValue(undefined)
+    queryClickHouseRows = vi.fn<QueryRows>().mockResolvedValue([])
     server = createApiServer({
       sessionStore,
       pingClickHouse,
+      queryClickHouseRows,
       sessionCleanupIntervalMs: false,
     })
     await listen(server)
@@ -172,5 +179,73 @@ describe('API service', () => {
     expect(response.headers.get('set-cookie')).toContain('ch_topo_session=')
     expect(response.headers.get('set-cookie')).toContain('Max-Age=0')
     expect(response.headers.get('set-cookie')).toContain('HttpOnly')
+  })
+
+  it('returns schema for the active server-side session', async () => {
+    sessionStore.create({
+      host: 'clickhouse.local',
+      port: 8123,
+      database: 'analytics',
+      user: 'readonly',
+      password: 'secret',
+    })
+    queryClickHouseRows.mockImplementation(({ sql }) => {
+      if (sql.includes('FROM system.tables')) {
+        return Promise.resolve([{ database: 'analytics', name: 'events' }])
+      }
+      return Promise.resolve([])
+    })
+
+    const response = await fetch(`${baseUrl}/api/schema`, {
+      headers: {
+        Cookie: 'ch_topo_session=session-1',
+      },
+    })
+
+    await expect(response.json()).resolves.toEqual({
+      tables: [{ database: 'analytics', name: 'events' }],
+      columns: [],
+      indices: [],
+      dictionaries: [],
+      rowPolicies: [],
+      grants: [],
+    })
+    expect(response.status).toBe(200)
+    const tablesCall = queryClickHouseRows.mock.calls.find(([request]) =>
+      request.sql.includes('FROM system.tables'),
+    )
+    expect(tablesCall?.[0].connection.password).toBe('secret')
+  })
+
+  it('rejects schema requests without a valid session cookie', async () => {
+    const response = await fetch(`${baseUrl}/api/schema`)
+
+    await expect(response.json()).resolves.toEqual({
+      error: 'Not connected',
+    })
+    expect(response.status).toBe(401)
+    expect(queryClickHouseRows).not.toHaveBeenCalled()
+  })
+
+  it('normalizes schema load failures', async () => {
+    sessionStore.create({
+      host: 'clickhouse.local',
+      port: 8123,
+      database: 'analytics',
+      user: 'readonly',
+      password: 'secret',
+    })
+    queryClickHouseRows.mockRejectedValue(new Error('system.tables denied'))
+
+    const response = await fetch(`${baseUrl}/api/schema`, {
+      headers: {
+        Cookie: 'ch_topo_session=session-1',
+      },
+    })
+
+    await expect(response.json()).resolves.toEqual({
+      error: 'system.tables denied',
+    })
+    expect(response.status).toBe(502)
   })
 })
