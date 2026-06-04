@@ -126,6 +126,25 @@ describe('executeQuery', () => {
     )
   })
 
+  it('blocks mutating queries before contacting ClickHouse by default', async () => {
+    const result = await executeQuery('DROP TABLE events', params)
+
+    expect(result.error).toBe('Read-only mode blocks DROP queries.')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('executes confirmed mutating queries when read-only mode is disabled', async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(jsonResponse([], []), { status: 200 }))
+
+    const result = await executeQuery('INSERT INTO audit VALUES (1)', params, {
+      readOnlyMode: false,
+      confirmedMutating: true,
+    })
+
+    expect(result.error).toBeUndefined()
+    expect(fetch).toHaveBeenCalled()
+  })
+
   it('does not send password header when password is empty', async () => {
     vi.mocked(fetch).mockResolvedValue(new Response(jsonResponse([], []), { status: 200 }))
 

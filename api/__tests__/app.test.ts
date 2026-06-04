@@ -405,6 +405,37 @@ describe('API service', () => {
     expect(response.status).toBe(502)
   })
 
+  it('returns query safety errors before reaching ClickHouse', async () => {
+    sessionStore.create({
+      host: 'clickhouse.local',
+      port: 8123,
+      database: 'analytics',
+      user: 'readonly',
+      password: 'secret',
+    })
+
+    const response = await fetch(`${baseUrl}/api/query`, {
+      method: 'POST',
+      headers: {
+        Cookie: 'ch_topo_session=session-1',
+      },
+      body: JSON.stringify({
+        sql: 'INSERT INTO audit VALUES (1)',
+        readOnly: false,
+      }),
+    })
+
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        message: 'INSERT queries require explicit confirmation.',
+        statusCode: 409,
+        code: 'QUERY_CONFIRMATION_REQUIRED',
+      },
+    })
+    expect(response.status).toBe(409)
+    expect(executeClickHouseRequest).not.toHaveBeenCalled()
+  })
+
   it('executes explain requests for the active server-side session', async () => {
     sessionStore.create({
       host: 'clickhouse.local',

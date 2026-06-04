@@ -74,4 +74,72 @@ describe('query service', () => {
       }),
     )
   })
+
+  it('blocks mutating queries in read-only mode before reaching ClickHouse', async () => {
+    const execute = vi.fn<ClickHouseExecute>().mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: '{}',
+    })
+
+    await expect(executeQuery(connection, { sql: 'DROP TABLE events' }, execute)).rejects.toEqual(
+      new QueryExecutionError({
+        message: 'Read-only mode blocks DROP queries.',
+        statusCode: 403,
+        code: 'QUERY_READ_ONLY_VIOLATION',
+      }),
+    )
+    expect(execute).not.toHaveBeenCalled()
+  })
+
+  it('requires confirmation for mutating queries when writes are enabled', async () => {
+    const execute = vi.fn<ClickHouseExecute>().mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: '{}',
+    })
+
+    await expect(
+      executeQuery(connection, { sql: 'INSERT INTO audit VALUES (1)', readOnly: false }, execute),
+    ).rejects.toEqual(
+      new QueryExecutionError({
+        message: 'INSERT queries require explicit confirmation.',
+        statusCode: 409,
+        code: 'QUERY_CONFIRMATION_REQUIRED',
+      }),
+    )
+    expect(execute).not.toHaveBeenCalled()
+  })
+
+  it('executes confirmed mutating queries when writes are enabled', async () => {
+    const execute = vi.fn<ClickHouseExecute>().mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: JSON.stringify({
+        meta: [],
+        data: [],
+        rows: 0,
+        statistics: { elapsed: 0.01, rows_read: 0, bytes_read: 0 },
+      }),
+    })
+
+    await expect(
+      executeQuery(
+        connection,
+        {
+          sql: 'INSERT INTO audit VALUES (1)',
+          readOnly: false,
+          confirmedMutating: true,
+        },
+        execute,
+      ),
+    ).resolves.toEqual({
+      columns: [],
+      rows: [],
+      elapsed: 0.01,
+      rowsRead: 0,
+      bytesRead: 0,
+    })
+    expect(execute).toHaveBeenCalledOnce()
+  })
 })

@@ -88,6 +88,10 @@ function optionalPositiveInteger(value: unknown): value is number | undefined {
   return value === undefined || (Number.isInteger(value) && typeof value === 'number' && value > 0)
 }
 
+function optionalBoolean(value: unknown): value is boolean | undefined {
+  return value === undefined || typeof value === 'boolean'
+}
+
 function isExplainMode(value: unknown): value is ExplainMode | undefined {
   return value === undefined || value === 'plan' || value === 'pipeline' || value === 'syntax'
 }
@@ -122,13 +126,15 @@ function parseConnectionPayload(value: unknown): BackendClickHouseConnection | u
 function parseQueryPayload(value: unknown): QueryRequestPayload | undefined {
   if (!isRecord(value)) return undefined
 
-  const { sql, timeoutMs, maxRows, maxBytes } = value
+  const { sql, timeoutMs, maxRows, maxBytes, readOnly, confirmedMutating } = value
 
   if (
     !nonEmptyString(sql) ||
     !optionalPositiveInteger(timeoutMs) ||
     !optionalPositiveInteger(maxRows) ||
-    !optionalPositiveInteger(maxBytes)
+    !optionalPositiveInteger(maxBytes) ||
+    !optionalBoolean(readOnly) ||
+    !optionalBoolean(confirmedMutating)
   ) {
     return undefined
   }
@@ -138,6 +144,8 @@ function parseQueryPayload(value: unknown): QueryRequestPayload | undefined {
     timeoutMs,
     maxRows,
     maxBytes,
+    readOnly,
+    confirmedMutating,
   }
 }
 
