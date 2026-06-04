@@ -1,4 +1,13 @@
-import { Clock, Eraser, Play, TableProperties, Braces } from 'lucide-react'
+import {
+  Braces,
+  Clock,
+  Eraser,
+  Play,
+  ShieldCheck,
+  ShieldOff,
+  TableProperties,
+  TriangleAlert,
+} from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ExplainView } from '@/components/playground/explain-view'
 import { QueryHistory } from '@/components/playground/query-history'
@@ -9,6 +18,7 @@ import { SqlEditor, type SqlEditorHandle } from '@/components/playground/sql-edi
 import { executeQuery, type QueryResult } from '@/lib/playground/execute'
 import { explainQuery, type ExplainMode, type ExplainResult } from '@/lib/playground/explain'
 import { addToHistory } from '@/lib/playground/history'
+import { validateQuerySafety } from '@/lib/playground/safety'
 import { cn } from '@/lib/utils'
 import { useConnectionStore } from '@/stores/connection-store'
 import { usePlaygroundStore } from '@/stores/playground-store'
@@ -68,6 +78,26 @@ function isMac(): boolean {
   return navigator.userAgent.includes('Mac')
 }
 
+function makeQueryErrorResult(error: string): QueryResult {
+  return {
+    columns: [],
+    rows: [],
+    elapsed: 0,
+    rowsRead: 0,
+    bytesRead: 0,
+    error,
+  }
+}
+
+interface ExecuteIntent {
+  confirmedMutating?: boolean
+}
+
+interface PendingMutatingQuery {
+  sql: string
+  message: string
+}
+
 // ── Component ──────────────────────────────────────────────────
 
 export function PlaygroundPage() {
@@ -78,6 +108,8 @@ export function PlaygroundPage() {
   const toggleFormat = usePlaygroundStore((s) => s.toggleFormat)
   const editorPct = usePlaygroundStore((s) => s.editorPct)
   const setEditorPct = usePlaygroundStore((s) => s.setEditorPct)
+  const readOnlyMode = usePlaygroundStore((s) => s.readOnlyMode)
+  const toggleReadOnlyMode = usePlaygroundStore((s) => s.toggleReadOnlyMode)
   const getParams = useConnectionStore((s) => s.getParams)
 
   const [queryState, setQueryState] = useState<QueryState>({ status: 'idle' })
@@ -85,6 +117,9 @@ export function PlaygroundPage() {
   const [cappedMessage, setCappedMessage] = useState<string | null>(null)
   const [explainResult, setExplainResult] = useState<ExplainResult | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [pendingMutatingQuery, setPendingMutatingQuery] = useState<PendingMutatingQuery | null>(
+    null,
+  )
 
   const abortRef = useRef<AbortController | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -111,54 +146,88 @@ export function PlaygroundPage() {
 
   // ── Execute ────────────────────────────────────────────────
 
-  const handleExecute = useCallback(() => {
-    const stmt = getActiveStatement()
-    if (!stmt) return
+  const handleExecute = useCallback(
+    (intent?: ExecuteIntent) => {
+      const stmt = getActiveStatement()
+      if (!stmt) return
 
-    abortRef.current?.abort()
-    const controller = new AbortController()
-    abortRef.current = controller
+      const safety = validateQuerySafety(stmt, {
+        readOnlyMode,
+        confirmedMutating: intent?.confirmedMutating,
+      })
 
-    setExplainResult(null)
-    setQueryState({
-      status: 'running',
-      onCancel: () => {
-        controller.abort()
-      },
-    })
+      if (!safety.allowed) {
+        setExplainResult(null)
+        setCappedMessage(null)
 
-    executeQuery(stmt, getParams(), { signal: controller.signal }).then(
-      (res) => {
-        if (controller.signal.aborted) return
-
-        const totalRows = res.rows.length
-        let displayResult = res
-        let capped: string | null = null
-
-        if (totalRows > MAX_DISPLAY_ROWS) {
-          displayResult = { ...res, rows: res.rows.slice(0, MAX_DISPLAY_ROWS) }
-          capped = `Showing first ${MAX_DISPLAY_ROWS} of ${totalRows.toLocaleString()} rows`
+        if (safety.reason === 'confirmation-required') {
+          setPendingMutatingQuery({
+            sql: stmt,
+            message: safety.message,
+          })
+          setResult(null)
+          setQueryState({ status: 'idle' })
+          return
         }
 
-        setResult(displayResult)
-        setCappedMessage(capped)
-        setQueryState(
-          res.error ? { status: 'error', result: res } : { status: 'success', result: res },
-        )
+        const errorResult = makeQueryErrorResult(safety.message)
+        setPendingMutatingQuery(null)
+        setResult(errorResult)
+        setQueryState({ status: 'error', result: errorResult })
+        return
+      }
 
-        addToHistory({
-          sql: stmt,
-          timestamp: Date.now(),
-          elapsed: res.elapsed,
-          rowsReturned: totalRows,
-          error: !!res.error,
-        })
-      },
-      () => {
-        // should not happen — executeQuery catches all errors
-      },
-    )
-  }, [getActiveStatement, getParams])
+      setPendingMutatingQuery(null)
+      abortRef.current?.abort()
+      const controller = new AbortController()
+      abortRef.current = controller
+
+      setExplainResult(null)
+      setQueryState({
+        status: 'running',
+        onCancel: () => {
+          controller.abort()
+        },
+      })
+
+      executeQuery(stmt, getParams(), {
+        signal: controller.signal,
+        readOnlyMode,
+        confirmedMutating: intent?.confirmedMutating,
+      }).then(
+        (res) => {
+          if (controller.signal.aborted) return
+
+          const totalRows = res.rows.length
+          let displayResult = res
+          let capped: string | null = null
+
+          if (totalRows > MAX_DISPLAY_ROWS) {
+            displayResult = { ...res, rows: res.rows.slice(0, MAX_DISPLAY_ROWS) }
+            capped = `Showing first ${MAX_DISPLAY_ROWS} of ${totalRows.toLocaleString()} rows`
+          }
+
+          setResult(displayResult)
+          setCappedMessage(capped)
+          setQueryState(
+            res.error ? { status: 'error', result: res } : { status: 'success', result: res },
+          )
+
+          addToHistory({
+            sql: stmt,
+            timestamp: Date.now(),
+            elapsed: res.elapsed,
+            rowsReturned: totalRows,
+            error: !!res.error,
+          })
+        },
+        () => {
+          // should not happen — executeQuery catches all errors
+        },
+      )
+    },
+    [getActiveStatement, getParams, readOnlyMode],
+  )
 
   // ── Explain ────────────────────────────────────────────────
 
@@ -213,6 +282,18 @@ export function PlaygroundPage() {
     [handleExplain],
   )
 
+  const handleConfirmMutatingQuery = useCallback(() => {
+    if (!pendingMutatingQuery) return
+
+    if (getActiveStatement() !== pendingMutatingQuery.sql) {
+      setPendingMutatingQuery(null)
+      handleExecute()
+      return
+    }
+
+    handleExecute({ confirmedMutating: true })
+  }, [getActiveStatement, handleExecute, pendingMutatingQuery])
+
   // ── Clear ──────────────────────────────────────────────────
 
   const handleClear = useCallback(() => {
@@ -220,6 +301,7 @@ export function PlaygroundPage() {
     setResult(null)
     setCappedMessage(null)
     setExplainResult(null)
+    setPendingMutatingQuery(null)
     setQueryState({ status: 'idle' })
   }, [])
 
@@ -331,7 +413,9 @@ export function PlaygroundPage() {
         {/* Execute */}
         <button
           type="button"
-          onClick={handleExecute}
+          onClick={() => {
+            handleExecute()
+          }}
           disabled={isRunning || !sql.trim()}
           title={`Execute (${modKey}+Enter)`}
           className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
@@ -341,6 +425,22 @@ export function PlaygroundPage() {
         </button>
 
         <div className="mx-1 h-4 w-px bg-border" />
+
+        {/* Safety mode */}
+        <button
+          type="button"
+          onClick={toggleReadOnlyMode}
+          title={readOnlyMode ? 'Read-only mode is on' : 'Writes are enabled'}
+          className={cn(
+            'inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs transition-colors',
+            readOnlyMode
+              ? 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/15 dark:text-emerald-400'
+              : 'bg-red-500/10 text-red-600 hover:bg-red-500/15 dark:text-red-400',
+          )}
+        >
+          {readOnlyMode ? <ShieldCheck className="h-3 w-3" /> : <ShieldOff className="h-3 w-3" />}
+          {readOnlyMode ? 'Read-only' : 'Writes enabled'}
+        </button>
 
         {/* Format toggle */}
         <button
@@ -429,6 +529,30 @@ export function PlaygroundPage() {
         <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
           {/* Query stats bar */}
           <QueryStats state={queryState} />
+
+          {/* Mutating query confirmation */}
+          {pendingMutatingQuery && (
+            <div className="flex items-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+              <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
+              <span className="min-w-0 flex-1 truncate">{pendingMutatingQuery.message}</span>
+              <button
+                type="button"
+                onClick={handleConfirmMutatingQuery}
+                className="rounded-md bg-amber-600 px-2.5 py-1 font-medium text-white transition-colors hover:bg-amber-700"
+              >
+                Run once
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingMutatingQuery(null)
+                }}
+                className="rounded-md px-2.5 py-1 text-amber-700 transition-colors hover:bg-amber-500/15 dark:text-amber-200"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
 
           {/* Capped rows message */}
           {cappedMessage && (

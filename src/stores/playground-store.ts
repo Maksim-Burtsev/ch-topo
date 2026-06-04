@@ -10,6 +10,9 @@ interface PlaygroundState {
   toggleFormat: () => void
   editorPct: number
   setEditorPct: (pct: number) => void
+  readOnlyMode: boolean
+  setReadOnlyMode: (readOnlyMode: boolean) => void
+  toggleReadOnlyMode: () => void
 }
 
 export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
@@ -27,5 +30,12 @@ export const usePlaygroundStore = create<PlaygroundState>((set, get) => ({
   editorPct: 40,
   setEditorPct: (editorPct) => {
     set({ editorPct })
+  },
+  readOnlyMode: true,
+  setReadOnlyMode: (readOnlyMode) => {
+    set({ readOnlyMode })
+  },
+  toggleReadOnlyMode: () => {
+    set({ readOnlyMode: !get().readOnlyMode })
   },
 }))

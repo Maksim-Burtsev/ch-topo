@@ -1,5 +1,6 @@
 import { executeClickHouseRequest } from '@/lib/clickhouse/transport'
 import type { ConnectionParams } from '@/lib/clickhouse/types'
+import { validateQuerySafety } from './safety'
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -32,6 +33,8 @@ interface ClickHouseJsonResponse {
 export interface ExecuteOptions {
   timeoutMs?: number
   signal?: AbortSignal
+  readOnlyMode?: boolean
+  confirmedMutating?: boolean
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000
@@ -72,6 +75,22 @@ export async function executeQuery(
   params: ConnectionParams,
   options?: ExecuteOptions,
 ): Promise<QueryResult> {
+  const safety = validateQuerySafety(sql, {
+    readOnlyMode: options?.readOnlyMode ?? true,
+    confirmedMutating: options?.confirmedMutating,
+  })
+
+  if (!safety.allowed) {
+    return {
+      columns: [],
+      rows: [],
+      elapsed: 0,
+      rowsRead: 0,
+      bytesRead: 0,
+      error: safety.message,
+    }
+  }
+
   const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS
 
   const controller = new AbortController()

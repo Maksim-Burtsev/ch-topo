@@ -22,6 +22,8 @@ export interface QueryRequestPayload {
   timeoutMs?: number
   maxRows?: number
   maxBytes?: number
+  readOnly?: boolean
+  confirmedMutating?: boolean
 }
 
 export interface QueryErrorPayload {

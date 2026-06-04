@@ -1,5 +1,6 @@
 import { BackendClickHouseError } from '../clickhouse/client.js'
 import type { BackendClickHouseConnection } from '../clickhouse/types.js'
+import { validateQuerySafety } from './safety.js'
 import type {
   ClickHouseExecute,
   QueryErrorPayload,
@@ -55,6 +56,10 @@ function buildLimitedSql(payload: QueryRequestPayload) {
 }
 
 export function normalizeQueryError(err: unknown): QueryExecutionError {
+  if (err instanceof QueryExecutionError) {
+    return err
+  }
+
   if (err instanceof BackendClickHouseError) {
     return new QueryExecutionError({
       message: err.message,
@@ -78,6 +83,20 @@ export async function executeQuery(
   execute: ClickHouseExecute,
   signal?: AbortSignal,
 ): Promise<QueryResult> {
+  const safety = validateQuerySafety(payload.sql, {
+    readOnlyMode: payload.readOnly ?? true,
+    confirmedMutating: payload.confirmedMutating,
+  })
+
+  if (!safety.allowed) {
+    throw new QueryExecutionError({
+      message: safety.message,
+      statusCode: safety.reason === 'read-only' ? 403 : 409,
+      code:
+        safety.reason === 'read-only' ? 'QUERY_READ_ONLY_VIOLATION' : 'QUERY_CONFIRMATION_REQUIRED',
+    })
+  }
+
   try {
     const response = await execute({
       connection,
