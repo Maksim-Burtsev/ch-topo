@@ -1,26 +1,25 @@
 import { createServer } from 'node:http'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
-import { queryClickHouseRows } from './clickhouse/client.js'
+import { queryClickHouseRows as defaultQueryClickHouseRows } from './clickhouse/client.js'
 import type { BackendClickHouseConnection } from './clickhouse/types.js'
+import { loadSchema } from './schema/service.js'
+import type { SchemaQueryRows } from './schema/types.js'
 import { InMemorySessionStore } from './sessions/store.js'
 
 const SESSION_COOKIE_NAME = 'ch_topo_session'
 const JSON_BODY_LIMIT_BYTES = 16 * 1024
 
-interface JsonBody {
-  [key: string]: unknown
-}
-
 export interface ApiServerOptions {
   sessionStore?: InMemorySessionStore
   pingClickHouse?: (connection: BackendClickHouseConnection) => Promise<void>
+  queryClickHouseRows?: SchemaQueryRows
   sessionCleanupIntervalMs?: number | false
 }
 
 function sendJson(
   res: ServerResponse,
   status: number,
-  body: JsonBody,
+  body: unknown,
   headers: Record<string, string> = {},
 ) {
   res.writeHead(status, {
@@ -53,6 +52,15 @@ function sessionCookie(sessionId: string, ttlMs: number) {
 
 function clearedSessionCookie() {
   return `${SESSION_COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`
+}
+
+function getSessionConnection(
+  req: IncomingMessage,
+  sessionStore: InMemorySessionStore,
+): BackendClickHouseConnection | undefined {
+  const sessionId = parseCookies(req.headers.cookie)[SESSION_COOKIE_NAME]
+  if (!sessionId) return undefined
+  return sessionStore.get(sessionId)?.connection
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -111,7 +119,7 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
 }
 
 async function defaultPingClickHouse(connection: BackendClickHouseConnection) {
-  await queryClickHouseRows<{ '1': number }>({
+  await defaultQueryClickHouseRows<{ '1': number }>({
     connection,
     sql: 'SELECT 1',
     timeoutMs: 5_000,
@@ -168,6 +176,30 @@ async function handleConnect(
   )
 }
 
+async function handleSchema(
+  req: IncomingMessage,
+  res: ServerResponse,
+  sessionStore: InMemorySessionStore,
+  queryRows: SchemaQueryRows,
+) {
+  const connection = getSessionConnection(req, sessionStore)
+
+  if (!connection) {
+    sendJson(res, 401, {
+      error: 'Not connected',
+    })
+    return
+  }
+
+  try {
+    sendJson(res, 200, await loadSchema(connection, queryRows))
+  } catch (err) {
+    sendJson(res, 502, {
+      error: err instanceof Error ? err.message : 'Failed to load schema',
+    })
+  }
+}
+
 function handleDisconnect(
   req: IncomingMessage,
   res: ServerResponse,
@@ -217,6 +249,11 @@ export async function handleApiRequest(
     return
   }
 
+  if (method === 'GET' && url.pathname === '/api/schema') {
+    await handleSchema(req, res, options.sessionStore, options.queryClickHouseRows)
+    return
+  }
+
   sendJson(res, 404, {
     error: 'Not found',
   })
@@ -226,6 +263,7 @@ export function createApiServer(options: ApiServerOptions = {}): Server {
   const serverOptions: Required<ApiServerOptions> = {
     sessionStore: options.sessionStore ?? new InMemorySessionStore(),
     pingClickHouse: options.pingClickHouse ?? defaultPingClickHouse,
+    queryClickHouseRows: options.queryClickHouseRows ?? defaultQueryClickHouseRows,
     sessionCleanupIntervalMs: options.sessionCleanupIntervalMs ?? 60_000,
   }
 
