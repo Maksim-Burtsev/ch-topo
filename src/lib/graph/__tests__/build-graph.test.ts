@@ -787,6 +787,68 @@ describe('distributed and buffer tables', () => {
     expect(graph.distributedTables.get('analytics.events_distributed')).toBe('analytics.events')
   })
 
+  it('parses Distributed engine with quoted identifiers and expression args', () => {
+    const tables: RawTableRow[] = [
+      {
+        database: 'analytics',
+        name: 'events_distributed',
+        engine: 'Distributed',
+        total_rows: '0',
+        total_bytes: '0',
+        data_compressed_bytes: '0',
+        create_table_query:
+          'CREATE TABLE analytics.events_distributed ENGINE = Distributed("prod-cluster", `analytics-db`, `events-local`, cityHash64(user_id))',
+        sorting_key: '',
+        partition_key: '',
+        metadata_modification_time: '2026-03-15 00:00:00',
+      },
+    ]
+
+    const graph = buildDependencyGraph(
+      tables,
+      rawColumns,
+      emptyIndices,
+      [],
+      emptyPolicies,
+      emptyGrants,
+    )
+
+    expect(graph.distributedTables.get('analytics.events_distributed')).toBe(
+      'analytics-db.events-local',
+    )
+  })
+
+  it('parses Distributed currentDatabase() using the table database', () => {
+    const tables: RawTableRow[] = [
+      {
+        database: 'analytics',
+        name: 'events_distributed',
+        engine: 'Distributed',
+        total_rows: '0',
+        total_bytes: '0',
+        data_compressed_bytes: '0',
+        create_table_query:
+          "CREATE TABLE analytics.events_distributed ENGINE = Distributed('cluster1', currentDatabase(), 'events_local', rand())",
+        sorting_key: '',
+        partition_key: '',
+        metadata_modification_time: '2026-03-15 00:00:00',
+      },
+    ]
+
+    const graph = buildDependencyGraph(
+      tables,
+      rawColumns,
+      emptyIndices,
+      [],
+      emptyPolicies,
+      emptyGrants,
+    )
+
+    expect(graph.distributedTables.get('analytics.events_distributed')).toBe(
+      'analytics.events_local',
+    )
+  })
+
   it('parses Buffer engine to extract destination table', () => {
     const tables: RawTableRow[] = [
       {
@@ -814,6 +876,35 @@ describe('distributed and buffer tables', () => {
     )
 
     expect(graph.bufferTables.get('analytics.events_buffer')).toBe('analytics.events')
+  })
+
+  it('parses Buffer engine with quoted destination identifiers', () => {
+    const tables: RawTableRow[] = [
+      {
+        database: 'analytics',
+        name: 'events_buffer',
+        engine: 'Buffer',
+        total_rows: '0',
+        total_bytes: '0',
+        data_compressed_bytes: '0',
+        create_table_query:
+          'CREATE TABLE analytics.events_buffer ENGINE = Buffer("analytics-db", `events-local`, 16, 10, 100, 10000, 100000, 10000000, 100000000)',
+        sorting_key: '',
+        partition_key: '',
+        metadata_modification_time: '2026-03-15 00:00:00',
+      },
+    ]
+
+    const graph = buildDependencyGraph(
+      tables,
+      rawColumns,
+      emptyIndices,
+      [],
+      emptyPolicies,
+      emptyGrants,
+    )
+
+    expect(graph.bufferTables.get('analytics.events_buffer')).toBe('analytics-db.events-local')
   })
 })
 
