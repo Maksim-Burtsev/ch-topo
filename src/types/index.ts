@@ -51,6 +51,7 @@ export type DDLAction =
   | { type: 'DROP_COLUMN'; table: string; column: string }
   | { type: 'MODIFY_COLUMN'; table: string; column: string; newType: string }
   | { type: 'RENAME_COLUMN'; table: string; oldName: string; newName: string }
+  | { type: 'RENAME_TABLE'; table: string; newName: string }
   | { type: 'DROP_TABLE'; table: string }
 
 export interface DDLHistoryEntry {
