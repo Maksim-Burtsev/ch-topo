@@ -23,15 +23,19 @@
     "node": "^22.22.1 || >=24.0.0"
   },
   "type": "module",
+  "bin": {
+    "chtopo": "./dist-cli/chtopo.js"
+  },
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "npm run cli:build && tsc -b && vite build",
+    "cli:build": "vite build --config vite.cli.config.ts",
     "api:build": "tsc -p tsconfig.api.json",
     "api:start": "node dist-api/main.js",
-    "lint": "eslint src/ api/ tests/ playwright.config.ts --max-warnings 0",
+    "lint": "eslint src/ api/ tests/ playwright.config.ts vite.config.ts vite.cli.config.ts --max-warnings 0",
     "lint:fix": "eslint src/ api/ --fix",
-    "format": "prettier --write src/ api/ tests/ playwright.config.ts",
-    "format:check": "prettier --check src/ api/ tests/ playwright.config.ts",
+    "format": "prettier --write src/ api/ tests/ playwright.config.ts vite.config.ts vite.cli.config.ts eslint.config.js",
+    "format:check": "prettier --check src/ api/ tests/ playwright.config.ts vite.config.ts vite.cli.config.ts eslint.config.js",
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:integration": "node scripts/run-clickhouse-integration.mjs",
