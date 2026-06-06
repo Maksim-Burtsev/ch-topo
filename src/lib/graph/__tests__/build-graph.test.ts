@@ -269,6 +269,161 @@ WHERE analytics.users.status = 'active'`,
     })
     expect(graph.columnToMVs.get('analytics.orders.status')).toBeUndefined()
   })
+
+  it('maps bare SELECT star over all joined source tables', () => {
+    const tables: RawTableRow[] = [
+      {
+        database: 'analytics',
+        name: 'events',
+        engine: 'MergeTree',
+        total_rows: '0',
+        total_bytes: '0',
+        data_compressed_bytes: '0',
+        create_table_query: 'CREATE TABLE analytics.events (event_id UUID, user_id UInt64)',
+        sorting_key: '',
+        partition_key: '',
+        metadata_modification_time: '2026-03-15 00:00:00',
+      },
+      {
+        database: 'analytics',
+        name: 'users',
+        engine: 'MergeTree',
+        total_rows: '0',
+        total_bytes: '0',
+        data_compressed_bytes: '0',
+        create_table_query: 'CREATE TABLE analytics.users (id UInt64, country String)',
+        sorting_key: '',
+        partition_key: '',
+        metadata_modification_time: '2026-03-15 00:00:00',
+      },
+      {
+        database: 'analytics',
+        name: 'all_joined_mv',
+        engine: 'MaterializedView',
+        total_rows: '0',
+        total_bytes: '0',
+        data_compressed_bytes: '0',
+        create_table_query: `CREATE MATERIALIZED VIEW analytics.all_joined_mv TO analytics.all_joined_target
+AS SELECT *
+FROM analytics.events AS e
+JOIN analytics.users AS u ON e.user_id = u.id`,
+        sorting_key: '',
+        partition_key: '',
+        metadata_modification_time: '2026-03-15 00:00:00',
+      },
+    ]
+    const columns: RawColumnRow[] = [
+      ...['event_id', 'user_id'].map((name) => ({
+        database: 'analytics',
+        table: 'events',
+        name,
+        type: name === 'event_id' ? 'UUID' : 'UInt64',
+        default_kind: '',
+        default_expression: '',
+        compression_codec: '',
+        data_compressed_bytes: '0',
+        data_uncompressed_bytes: '0',
+      })),
+      ...['id', 'country'].map((name) => ({
+        database: 'analytics',
+        table: 'users',
+        name,
+        type: name === 'country' ? 'String' : 'UInt64',
+        default_kind: '',
+        default_expression: '',
+        compression_codec: '',
+        data_compressed_bytes: '0',
+        data_uncompressed_bytes: '0',
+      })),
+    ]
+
+    const graph = buildDependencyGraph(tables, columns, [], [], [], [])
+
+    expect(graph.columnToMVs.get('analytics.events.event_id')).toContainEqual({
+      mvName: 'analytics.all_joined_mv',
+      usageContext: 'select',
+    })
+    expect(graph.columnToMVs.get('analytics.users.country')).toContainEqual({
+      mvName: 'analytics.all_joined_mv',
+      usageContext: 'select',
+    })
+  })
+
+  it('maps qualified SELECT star only to the referenced source table', () => {
+    const tables: RawTableRow[] = [
+      {
+        database: 'analytics',
+        name: 'events',
+        engine: 'MergeTree',
+        total_rows: '0',
+        total_bytes: '0',
+        data_compressed_bytes: '0',
+        create_table_query: 'CREATE TABLE analytics.events (event_id UUID, user_id UInt64)',
+        sorting_key: '',
+        partition_key: '',
+        metadata_modification_time: '2026-03-15 00:00:00',
+      },
+      {
+        database: 'analytics',
+        name: 'users',
+        engine: 'MergeTree',
+        total_rows: '0',
+        total_bytes: '0',
+        data_compressed_bytes: '0',
+        create_table_query: 'CREATE TABLE analytics.users (id UInt64, country String)',
+        sorting_key: '',
+        partition_key: '',
+        metadata_modification_time: '2026-03-15 00:00:00',
+      },
+      {
+        database: 'analytics',
+        name: 'events_only_mv',
+        engine: 'MaterializedView',
+        total_rows: '0',
+        total_bytes: '0',
+        data_compressed_bytes: '0',
+        create_table_query: `CREATE MATERIALIZED VIEW analytics.events_only_mv TO analytics.events_only_target
+AS SELECT e.*
+FROM analytics.events AS e
+JOIN analytics.users AS u ON e.user_id = u.id`,
+        sorting_key: '',
+        partition_key: '',
+        metadata_modification_time: '2026-03-15 00:00:00',
+      },
+    ]
+    const columns: RawColumnRow[] = [
+      ...['event_id', 'user_id'].map((name) => ({
+        database: 'analytics',
+        table: 'events',
+        name,
+        type: name === 'event_id' ? 'UUID' : 'UInt64',
+        default_kind: '',
+        default_expression: '',
+        compression_codec: '',
+        data_compressed_bytes: '0',
+        data_uncompressed_bytes: '0',
+      })),
+      ...['id', 'country'].map((name) => ({
+        database: 'analytics',
+        table: 'users',
+        name,
+        type: name === 'country' ? 'String' : 'UInt64',
+        default_kind: '',
+        default_expression: '',
+        compression_codec: '',
+        data_compressed_bytes: '0',
+        data_uncompressed_bytes: '0',
+      })),
+    ]
+
+    const graph = buildDependencyGraph(tables, columns, [], [], [], [])
+
+    expect(graph.columnToMVs.get('analytics.events.event_id')).toContainEqual({
+      mvName: 'analytics.events_only_mv',
+      usageContext: 'select',
+    })
+    expect(graph.columnToMVs.get('analytics.users.country')).toBeUndefined()
+  })
 })
 
 // ─── MergeTree Internal Dependencies ──────────────────────────────────

@@ -71,6 +71,10 @@ function getReferenceSourceTables(
   return sourceTables.filter((sourceTable) => columnsByTable.get(sourceTable)?.has(column))
 }
 
+function getSelectStarSourceTables(starSource: string | null, sourceTables: string[]): string[] {
+  return starSource ? [starSource] : sourceTables
+}
+
 function parseDistributedEngine(ddl: string): string | null {
   // ENGINE = Distributed(cluster, db, table[, sharding_key])
   const match = /\bDistributed\s*\(\s*'?(\w+)'?\s*,\s*'?(\w+)'?\s*,\s*'?(\w+)'?/i.exec(ddl)
@@ -179,20 +183,23 @@ export function buildDependencyGraph(
       graph.mvTargets.set(tableKey, parsed.targetTable)
 
       // columnToMVs
-      if (parsed.selectsAll && sourceTables.length > 0) {
-        // SELECT * — all source columns are referenced.
-        for (const sourceTable of sourceTables) {
-          const allCols = columnsByTable.get(sourceTable)
-          if (allCols) {
-            for (const col of allCols) {
-              addColumnToMVRef(graph.columnToMVs, `${sourceTable}.${col}`, {
-                mvName: tableKey,
-                usageContext: 'select',
-              })
+      if (parsed.selectStarSources.length > 0 && sourceTables.length > 0) {
+        for (const starSource of parsed.selectStarSources) {
+          for (const sourceTable of getSelectStarSourceTables(starSource, sourceTables)) {
+            const allCols = columnsByTable.get(sourceTable)
+            if (allCols) {
+              for (const col of allCols) {
+                addColumnToMVRef(graph.columnToMVs, `${sourceTable}.${col}`, {
+                  mvName: tableKey,
+                  usageContext: 'select',
+                })
+              }
             }
           }
         }
-      } else if (sourceTables.length > 0) {
+      }
+
+      if (sourceTables.length > 0) {
         for (const ref of parsed.referencedColumns) {
           const refSourceTables = getReferenceSourceTables(
             ref.column,
