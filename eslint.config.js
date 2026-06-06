@@ -106,4 +106,22 @@ export default defineConfig([
       ...baseRules,
     },
   },
+  {
+    files: ['playwright.config.ts', 'tests/**/*.ts'],
+    extends: [js.configs.recommended, tseslint.configs.strictTypeChecked, prettier],
+    plugins: {
+      'import-x': importPlugin,
+    },
+    languageOptions: {
+      ecmaVersion: 2023,
+      globals: globals.node,
+      parserOptions: {
+        project: './tsconfig.playwright.json',
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      ...baseRules,
+    },
+  },
 ])
