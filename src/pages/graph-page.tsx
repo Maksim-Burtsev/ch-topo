@@ -14,7 +14,7 @@ import {
 } from '@xyflow/react'
 import type { Edge, Node, NodeMouseHandler, Viewport } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { ChevronDown, ChevronRight, Info, Map, RefreshCw } from 'lucide-react'
+import { ChevronDown, ChevronRight, Download, Info, Map, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DictDetailPanel } from '@/components/graph/dict-detail-panel'
 import { SchemaNode } from '@/components/graph/schema-node'
@@ -23,6 +23,7 @@ import { DatabaseFilter } from '@/components/shared/database-filter'
 import { SchemaDataNotice } from '@/components/shared/schema-data-notice'
 import type { RawTableRow } from '@/lib/clickhouse/types'
 import { getEffectiveDatabase } from '@/lib/database-utils'
+import { buildGraphSvg } from '@/lib/graph/export-svg'
 import { alignOneToOnePairs, attachParentIds, filterDictTables } from '@/lib/graph/layout-utils'
 import type { DependencyGraph } from '@/lib/graph/types'
 import { formatBytes, formatNumber } from '@/lib/utils'
@@ -67,6 +68,16 @@ function loadViewport(): Viewport | null {
     // sessionStorage unavailable or corrupt data
   }
   return null
+}
+
+function downloadTextFile(filename: string, content: string, type: string) {
+  const blob = new Blob([content], { type })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
 }
 
 function getUnlinkedCollapsedKey(): string {
@@ -964,6 +975,16 @@ function GraphPageInner() {
     void loadSchema(getParams(), { mode: connectionMode })
   }, [schemaStatus, connectionMode, loadSchema, getParams])
 
+  const handleExportGraph = useCallback(() => {
+    const scope = databaseFilter || 'all-databases'
+    const safeScope = scope.replace(/[^a-z0-9_.-]+/gi, '-').toLowerCase()
+    downloadTextFile(
+      `chtopo-graph-${safeScope}.svg`,
+      buildGraphSvg({ nodes, edges, databaseFilter }),
+      'image/svg+xml;charset=utf-8',
+    )
+  }, [nodes, edges, databaseFilter])
+
   // Resolve selected dictionary first — dictionaries also exist in system.tables
   // with engine='Dictionary', so we need to check dictionaries before tables.
   const selectedDict = useMemo(() => {
@@ -1065,6 +1086,14 @@ function GraphPageInner() {
                 strokeWidth={1.75}
                 className={schemaStatus === 'loading' ? 'animate-spin' : ''}
               />
+            </button>
+            <button
+              onClick={handleExportGraph}
+              title="Export graph as SVG"
+              className="react-flow__controls-button [&>svg]:!fill-none"
+              disabled={nodes.length === 0}
+            >
+              <Download size={16} strokeWidth={1.75} />
             </button>
           </Controls>
           {showMinimap && (
