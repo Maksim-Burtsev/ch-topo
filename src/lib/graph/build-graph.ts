@@ -232,6 +232,9 @@ export function buildDependencyGraph(
       if (parsed.sampleByColumn) {
         graph.sampleByColumn.set(tableKey, parsed.sampleByColumn)
       }
+      for (const [projectionName, projectionColumns] of Object.entries(parsed.projectionColumns)) {
+        graph.projectionColumns.set(`${tableKey}.${projectionName}`, projectionColumns)
+      }
 
       // Distributed tables
       if (table.engine === 'Distributed') {

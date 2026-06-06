@@ -62,6 +62,37 @@ SETTINGS index_granularity = 8192`
     expect(result.sampleByColumn).toBe('user_id')
   })
 
+  it('parses MergeTree projections and their referenced columns', () => {
+    const ddl = `CREATE TABLE analytics.events
+(
+    event_date Date,
+    event_time DateTime,
+    user_id UInt64,
+    revenue Decimal(18, 2),
+    PROJECTION user_revenue_projection
+    (
+        SELECT
+            user_id,
+            toDate(event_time) AS event_day,
+            sum(revenue) AS total_revenue
+        GROUP BY
+            user_id,
+            event_day
+        ORDER BY
+            (user_id, event_day)
+    )
+)
+ENGINE = MergeTree
+ORDER BY (event_date, user_id)`
+
+    const cols = new Set(['event_date', 'event_time', 'user_id', 'revenue'])
+    const result = parseDDL(ddl, 'MergeTree', cols)
+
+    expect(result.projectionColumns).toEqual({
+      user_revenue_projection: ['user_id', 'event_time', 'revenue'],
+    })
+  })
+
   it('parses ReplicatedMergeTree (ORDER BY still works)', () => {
     const ddl = `CREATE TABLE analytics.events_replicated
 (
