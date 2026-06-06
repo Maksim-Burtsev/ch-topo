@@ -56,7 +56,6 @@ Record the browser, OS, and ClickHouse version used. Minimum manual flow:
 - Graph export downloads an SVG.
 - Tables page filters and opens a detail page.
 - Impact page analyzes a break-level `ALTER TABLE ... DROP COLUMN`.
-- Snapshots page saves a baseline and shows no diff against the current schema.
 - Playground allows safe read-only SQL and blocks unsafe SQL.
 - DDL History shows rows or a clear permission warning.
 

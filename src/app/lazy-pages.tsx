@@ -9,9 +9,6 @@ export const GraphPage = lazy(() =>
 export const TablesPage = lazy(() =>
   import('@/pages/tables/tables-page').then((mod) => ({ default: mod.TablesPage })),
 )
-export const SnapshotsPage = lazy(() =>
-  import('@/pages/snapshots-page').then((mod) => ({ default: mod.SnapshotsPage })),
-)
 export const TableDetailPage = lazy(() =>
   import('@/pages/tables/table-detail-page').then((mod) => ({ default: mod.TableDetailPage })),
 )
