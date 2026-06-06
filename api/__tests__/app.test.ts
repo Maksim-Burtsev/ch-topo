@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MockedFunction } from 'vitest'
 import { createApiServer } from '../app.js'
+import { InMemoryAuditLog } from '../audit-log/store.js'
 import type {
   BackendClickHouseConnection,
   BackendClickHouseResponse,
@@ -29,6 +30,7 @@ let sessionStore: InMemorySessionStore
 let pingClickHouse: MockedFunction<PingClickHouse>
 let queryClickHouseRows: MockedFunction<QueryRows>
 let executeClickHouseRequest: MockedFunction<ExecuteClickHouse>
+let auditLog: InMemoryAuditLog
 
 function listen(serverToStart: Server): Promise<void> {
   return new Promise((resolve) => {
@@ -71,11 +73,16 @@ describe('API service', () => {
         statistics: { elapsed: 0, rows_read: 0, bytes_read: 0 },
       }),
     })
+    auditLog = new InMemoryAuditLog({
+      now: () => 2_000,
+      idGenerator: () => `audit-${auditLog.list().length + 1}`,
+    })
     server = createApiServer({
       sessionStore,
       pingClickHouse,
       queryClickHouseRows,
       executeClickHouseRequest,
+      auditLog,
       sessionCleanupIntervalMs: false,
     })
     await listen(server)
@@ -134,6 +141,16 @@ describe('API service', () => {
       user: 'readonly',
       password: 'secret',
     })
+    expect(auditLog.list()).toEqual([
+      expect.objectContaining({
+        event: 'connect',
+        status: 'success',
+        sessionId: 'session-1',
+        targetHost: 'clickhouse.local',
+        durationMs: expect.any(Number) as number,
+      }) as unknown,
+    ])
+    expect(JSON.stringify(auditLog.list())).not.toContain('secret')
   })
 
   it('rejects invalid connect payloads without creating a session', async () => {
@@ -176,6 +193,14 @@ describe('API service', () => {
     expect(response.status).toBe(502)
     expect(response.headers.get('set-cookie')).toBeNull()
     expect(sessionStore.get('session-1')).toBeUndefined()
+    expect(auditLog.list()).toEqual([
+      expect.objectContaining({
+        event: 'connect',
+        status: 'error',
+        targetHost: 'clickhouse.local',
+      }) as unknown,
+    ])
+    expect(JSON.stringify(auditLog.list())).not.toContain('secret')
   })
 
   it('disconnects by deleting the server-side session and clearing the cookie', async () => {
@@ -202,6 +227,14 @@ describe('API service', () => {
     expect(response.headers.get('set-cookie')).toContain('ch_topo_session=')
     expect(response.headers.get('set-cookie')).toContain('Max-Age=0')
     expect(response.headers.get('set-cookie')).toContain('HttpOnly')
+    expect(auditLog.list()).toEqual([
+      expect.objectContaining({
+        event: 'disconnect',
+        status: 'success',
+        sessionId: 'session-1',
+        targetHost: 'clickhouse.local',
+      }) as unknown,
+    ])
   })
 
   it('returns schema for the active server-side session', async () => {
@@ -374,6 +407,17 @@ describe('API service', () => {
     })
     expect(response.status).toBe(200)
     expect(executeClickHouseRequest.mock.calls[0]?.[0].connection.password).toBe('secret')
+    expect(auditLog.list()).toEqual([
+      expect.objectContaining({
+        event: 'query',
+        status: 'success',
+        sessionId: 'session-1',
+        targetHost: 'clickhouse.local',
+        queryKind: 'SELECT',
+      }) as unknown,
+    ])
+    expect(JSON.stringify(auditLog.list())).not.toContain('SELECT id FROM events')
+    expect(JSON.stringify(auditLog.list())).not.toContain('secret')
   })
 
   it('returns consistent query errors', async () => {
