@@ -21,6 +21,7 @@ export interface ParsedTable {
   sourceTables: string[]
   targetTable: string | null
   referencedColumns: ColumnReference[]
+  selectStarSources: Array<string | null>
 
   // Flags
   selectsAll: boolean
@@ -40,6 +41,7 @@ export function emptyParsedTable(): ParsedTable {
     sourceTables: [],
     targetTable: null,
     referencedColumns: [],
+    selectStarSources: [],
     selectsAll: false,
   }
 }

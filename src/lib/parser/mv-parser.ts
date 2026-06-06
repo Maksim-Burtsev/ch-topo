@@ -59,10 +59,6 @@ export function parseMaterializedView(
   const selectDdl = extractSelectQuery(ddl)
   if (!selectDdl) return result
 
-  if (/\bSELECT\s+\*/i.test(selectDdl)) {
-    result.selectsAll = true
-  }
-
   const sourceScan = scanSources(selectDdl)
   result.sourceTables = sourceScan.sourceTables
   result.sourceTable = sourceScan.sourceTables[0] ?? null
@@ -71,6 +67,13 @@ export function parseMaterializedView(
 
   const selectClause = extractClause(selectDdl, /\bSELECT\b/i, /\bFROM\b/i)
   if (selectClause) {
+    result.selectStarSources = extractSelectStarSources(
+      selectClause,
+      sourceScan.aliasMap,
+      sourceScan.sourceTables,
+    )
+    result.selectsAll = result.selectStarSources.length > 0
+
     addRefs(
       refs,
       selectClause,
@@ -316,6 +319,57 @@ function mergeSourceScan(
   for (const [alias, sourceTable] of scan.aliasMap) {
     aliasMap.set(alias, sourceTable)
   }
+}
+
+function extractSelectStarSources(
+  selectClause: string,
+  aliasMap: Map<string, string>,
+  sourceTables: string[],
+): Array<string | null> {
+  const identifier = '`(?:``|[^`])+`|"(?:[^"]|"")+"|[A-Za-z_][\\w$]*'
+  const identifierGroup = `(?:${identifier})`
+  const starRe = new RegExp(
+    `(?:(${identifierGroup}(?:\\s*\\.\\s*${identifierGroup})*)\\s*\\.\\s*)?\\*`,
+    'g',
+  )
+  const partRe = new RegExp(identifierGroup, 'g')
+  const starSources: Array<string | null> = []
+  let match: RegExpExecArray | null
+
+  while ((match = starRe.exec(selectClause)) !== null) {
+    if (isFunctionArgumentStar(selectClause, match.index)) continue
+
+    const qualifier = match[1]
+    if (!qualifier) {
+      addUniqueStarSource(starSources, null)
+      continue
+    }
+
+    const parts = Array.from(qualifier.matchAll(partRe), (part) =>
+      normalizeIdentifier(part[0]),
+    ).filter((part): part is string => Boolean(part))
+    const sourceTable = aliasMap.get(parts.join('.'))
+    if (sourceTable && sourceTables.includes(sourceTable)) {
+      addUniqueStarSource(starSources, sourceTable)
+    }
+  }
+
+  return starSources
+}
+
+function addUniqueStarSource(values: Array<string | null>, value: string | null): void {
+  if (!values.includes(value)) {
+    values.push(value)
+  }
+}
+
+function isFunctionArgumentStar(sql: string, starIndex: number): boolean {
+  let i = starIndex - 1
+  while (i >= 0 && /\s/.test(sql[i] ?? '')) {
+    i -= 1
+  }
+
+  return sql[i] === '('
 }
 
 function extractClause(ddl: string, startRe: RegExp, endRe: RegExp): string | null {

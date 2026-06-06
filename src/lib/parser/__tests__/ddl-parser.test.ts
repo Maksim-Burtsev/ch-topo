@@ -404,8 +404,27 @@ AS SELECT * FROM analytics.events`
     const result = parseDDL(ddl, 'MaterializedView', new Set())
 
     expect(result.selectsAll).toBe(true)
+    expect(result.selectStarSources).toEqual([null])
     expect(result.sourceTable).toBe('analytics.events')
     expect(result.targetTable).toBe('analytics.all_target')
+  })
+
+  it('detects table-qualified SELECT stars', () => {
+    const ddl = `CREATE MATERIALIZED VIEW analytics.events_only_mv TO analytics.events_only_target
+AS SELECT e.*, u.country
+FROM analytics.events AS e
+JOIN analytics.users AS u ON e.user_id = u.id`
+
+    const cols = new Set(['event_date', 'user_id', 'id', 'country'])
+    const result = parseDDL(ddl, 'MaterializedView', cols)
+
+    expect(result.selectsAll).toBe(true)
+    expect(result.selectStarSources).toEqual(['analytics.events'])
+    expect(result.referencedColumns).toContainEqual({
+      column: 'country',
+      context: 'select',
+      sourceTable: 'analytics.users',
+    })
   })
 
   it('parses MV with functions: uniqExact(col), count(), sum(col)', () => {
