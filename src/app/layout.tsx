@@ -1,4 +1,5 @@
 import {
+  GitCompareArrows,
   History,
   Loader2,
   LogOut,
@@ -23,9 +24,10 @@ import { getRouteTitle } from './route-meta'
 const navItems = [
   { path: '/', icon: Workflow, label: 'Graph', key: '1' },
   { path: '/tables', icon: Table2, label: 'Tables', key: '2' },
-  { path: '/impact', icon: Zap, label: 'Impact', key: '3' },
-  { path: '/playground', icon: SquareTerminal, label: 'Playground', key: '4' },
-  { path: '/history', icon: History, label: 'History', key: '5' },
+  { path: '/snapshots', icon: GitCompareArrows, label: 'Snapshots', key: '3' },
+  { path: '/impact', icon: Zap, label: 'Impact', key: '4' },
+  { path: '/playground', icon: SquareTerminal, label: 'Playground', key: '5' },
+  { path: '/history', icon: History, label: 'History', key: '6' },
 ]
 
 function getModeLabel(mode: 'direct' | 'server' | 'demo') {
