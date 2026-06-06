@@ -1,0 +1,95 @@
+name: Migration Impact
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'migrations/**/*.sql'
+      - 'database/migrations/**/*.sql'
+      - 'db/migrations/**/*.sql'
+      - 'chtopo-schema.json'
+      - '.github/workflows/migration-impact.yml'
+      - 'scripts/run-migration-impact.mjs'
+      - 'src/cli/**'
+      - 'package.json'
+      - 'package-lock.json'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  migration-impact:
+    runs-on: ubuntu-latest
+    env:
+      CHTOPO_SCHEMA_PATH: chtopo-schema.json
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Collect changed migration files
+        id: files
+        shell: bash
+        run: |
+          git diff --name-only --diff-filter=ACMR \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}" \
+            -- \
+            ':(glob)migrations/**/*.sql' \
+            ':(glob)database/migrations/**/*.sql' \
+            ':(glob)db/migrations/**/*.sql' > migration-files.txt
+
+          if [ -s migration-files.txt ]; then
+            echo "has_files=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_files=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run ch-topo migration impact checks
+        id: impact
+        if: steps.files.outputs.has_files == 'true'
+        shell: bash
+        run: |
+          if [ ! -f "$CHTOPO_SCHEMA_PATH" ]; then
+            cat > migration-impact-comment.md <<'EOF'
+          <!-- chtopo:migration-impact -->
+          ## ch-topo migration impact
+
+          Schema file was not found. Configure `CHTOPO_SCHEMA_PATH` in `.github/workflows/migration-impact.yml` or commit a sanitized `chtopo-schema.json`.
+          EOF
+            echo "exit_code=2" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          mapfile -t files < migration-files.txt
+          set +e
+          node scripts/run-migration-impact.mjs \
+            --schema "$CHTOPO_SCHEMA_PATH" \
+            --comment-file migration-impact-comment.md \
+            -- "${files[@]}"
+          status=$?
+          set -e
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+
+      - name: Comment migration impact summary
+        if: always() && steps.files.outputs.has_files == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr comment "${{ github.event.pull_request.number }}" \
+            --body-file migration-impact-comment.md \
+            --edit-last \
+            --create-if-none
+
+      - name: Fail on migration impact errors
+        if: always() && steps.files.outputs.has_files == 'true' && steps.impact.outputs.exit_code != '0'
+        run: exit "${{ steps.impact.outputs.exit_code }}"
