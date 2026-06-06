@@ -13,6 +13,16 @@ const OPERATION_TYPES = ['Create', 'Alter', 'Drop', 'Rename'] as const
 
 type DatePreset = '' | 'today' | '7d' | '30d' | 'custom'
 
+function isPermissionError(error: string | null): boolean {
+  if (!error) return false
+  const lower = error.toLowerCase()
+  return (
+    lower.includes('permission') ||
+    lower.includes('access_denied') ||
+    lower.includes('not enough privileges')
+  )
+}
+
 function startOfDay(d: Date): Date {
   const copy = new Date(d)
   copy.setHours(0, 0, 0, 0)
@@ -162,15 +172,26 @@ export function HistoryPage() {
   }
 
   if (status === 'error') {
+    const permissionError = isPermissionError(error)
+
     return (
       <div className="max-w-3xl">
         <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
           <AlertTriangle size={16} className="mt-0.5 text-amber-400 shrink-0" />
           <div>
-            <p className="text-sm font-medium text-amber-400">Could not load DDL history</p>
-            <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-              {error ?? 'Access to system.query_log may require additional permissions.'}
+            <p className="text-sm font-medium text-amber-400">
+              {permissionError ? 'DDL history permission required' : 'Could not load DDL history'}
             </p>
+            <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+              {permissionError
+                ? 'Grant SELECT on system.query_log to enable history, or continue using graph and tables without DDL history.'
+                : (error ?? 'Access to system.query_log may require additional permissions.')}
+            </p>
+            {permissionError && error && (
+              <p className="mt-2 rounded bg-muted/50 px-2 py-1 text-[11px] text-muted-foreground">
+                {error}
+              </p>
+            )}
           </div>
         </div>
       </div>

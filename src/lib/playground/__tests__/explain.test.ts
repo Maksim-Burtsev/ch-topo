@@ -255,4 +255,52 @@ describe('explainQuery', () => {
     const init = callArgs?.[1]
     expect(init?.body).not.toContain('FORMAT JSON')
   })
+
+  it('runs explain through the server API in Server Mode', async () => {
+    const resultBody = { mode: 'pipeline', text: 'Expression\nReadFromMergeTree' }
+
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify(resultBody), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+
+    const result = await explainQuery('SELECT 1', params, 'pipeline', {
+      connectionMode: 'server',
+      timeoutMs: 1234,
+    })
+
+    expect(result).toEqual(resultBody)
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/explain',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sql: 'SELECT 1',
+          mode: 'pipeline',
+          timeoutMs: 1234,
+        }),
+      }),
+    )
+  })
+
+  it('returns a reconnect state when the server explain session expires', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ error: { message: 'Not connected', statusCode: 401 } }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+
+    const result = await explainQuery('SELECT 1', params, 'plan', { connectionMode: 'server' })
+
+    expect(result.sessionExpired).toBe(true)
+    expect(result.error).toBe(
+      'Server session expired. Reconnect to ClickHouse and run EXPLAIN again.',
+    )
+    expect(result.text).toBe('')
+  })
 })

@@ -2,6 +2,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { DatabaseFilter } from '@/components/shared/database-filter'
+import { SchemaDataNotice } from '@/components/shared/schema-data-notice'
 import { Badge } from '@/components/ui/badge'
 import { getEngineVariant } from '@/components/ui/engine-variant'
 import { Input } from '@/components/ui/input'
@@ -52,6 +53,8 @@ export function TablesPage() {
   const navigate = useNavigate()
   const tables = useSchemaStore((s) => s.tables)
   const tablesReady = useSchemaStore((s) => s.tablesReady)
+  const columnsReady = useSchemaStore((s) => s.columnsReady)
+  const warnings = useSchemaStore((s) => s.warnings)
   const status = useSchemaStore((s) => s.status)
 
   const [filter, setFilter] = useState('')
@@ -221,6 +224,13 @@ export function TablesPage() {
           </button>
         )}
       </div>
+      <SchemaDataNotice
+        status={status}
+        tablesReady={tablesReady}
+        columnsReady={columnsReady}
+        warnings={warnings}
+        className="mb-3 max-w-2xl"
+      />
       {tablesReady && tables.length === 0 && (
         <div className="flex flex-col items-center justify-center h-64 rounded-lg border border-border text-center">
           <p className="text-sm font-medium text-muted-foreground">No tables found</p>
