@@ -15,6 +15,7 @@ export interface ParsedTable {
   ttlColumns: string[]
   sampleByColumn: string | null
   projectionColumns: Record<string, string[]>
+  constraintColumns: Record<string, string[]>
   settings: Record<string, string>
 
   // MV fields
@@ -38,6 +39,7 @@ export function emptyParsedTable(): ParsedTable {
     ttlColumns: [],
     sampleByColumn: null,
     projectionColumns: {},
+    constraintColumns: {},
     settings: {},
     sourceTable: null,
     sourceTables: [],

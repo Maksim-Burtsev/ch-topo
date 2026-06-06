@@ -523,6 +523,51 @@ ORDER BY (event_date, user_id)`,
       'revenue',
     ])
   })
+
+  it('extracts constraint column dependencies from MergeTree DDL', () => {
+    const tables: RawTableRow[] = [
+      {
+        database: 'analytics',
+        name: 'events',
+        engine: 'MergeTree',
+        total_rows: '0',
+        total_bytes: '0',
+        data_compressed_bytes: '0',
+        create_table_query: `CREATE TABLE analytics.events
+(
+    event_date Date,
+    user_id UInt64,
+    revenue Decimal(18, 2),
+    CONSTRAINT positive_user CHECK user_id > 0,
+    CONSTRAINT sane_revenue CHECK revenue >= 0 AND toYear(event_date) >= 2020
+)
+ENGINE = MergeTree
+ORDER BY (event_date, user_id)`,
+        sorting_key: '',
+        partition_key: '',
+        metadata_modification_time: '2026-03-15 00:00:00',
+      },
+    ]
+    const columns: RawColumnRow[] = ['event_date', 'user_id', 'revenue'].map((name) => ({
+      database: 'analytics',
+      table: 'events',
+      name,
+      type: name === 'revenue' ? 'Decimal(18, 2)' : 'UInt64',
+      default_kind: '',
+      default_expression: '',
+      compression_codec: '',
+      data_compressed_bytes: '0',
+      data_uncompressed_bytes: '0',
+    }))
+
+    const graph = buildDependencyGraph(tables, columns, [], [], [], [])
+
+    expect(graph.constraintColumns.get('analytics.events.positive_user')).toEqual(['user_id'])
+    expect(graph.constraintColumns.get('analytics.events.sane_revenue')).toEqual([
+      'revenue',
+      'event_date',
+    ])
+  })
 })
 
 // ─── Dictionary Sources ───────────────────────────────────────────────
