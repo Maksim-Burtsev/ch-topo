@@ -235,6 +235,9 @@ export function buildDependencyGraph(
       for (const [projectionName, projectionColumns] of Object.entries(parsed.projectionColumns)) {
         graph.projectionColumns.set(`${tableKey}.${projectionName}`, projectionColumns)
       }
+      for (const [constraintName, constraintColumns] of Object.entries(parsed.constraintColumns)) {
+        graph.constraintColumns.set(`${tableKey}.${constraintName}`, constraintColumns)
+      }
 
       // Distributed tables
       if (table.engine === 'Distributed') {

@@ -93,6 +93,27 @@ ORDER BY (event_date, user_id)`
     })
   })
 
+  it('parses MergeTree constraints and their referenced columns', () => {
+    const ddl = `CREATE TABLE analytics.events
+(
+    event_date Date,
+    user_id UInt64,
+    revenue Decimal(18, 2),
+    CONSTRAINT positive_user CHECK user_id > 0,
+    CONSTRAINT sane_revenue CHECK revenue >= 0 AND toYear(event_date) >= 2020
+)
+ENGINE = MergeTree
+ORDER BY (event_date, user_id)`
+
+    const cols = new Set(['event_date', 'user_id', 'revenue'])
+    const result = parseDDL(ddl, 'MergeTree', cols)
+
+    expect(result.constraintColumns).toEqual({
+      positive_user: ['user_id'],
+      sane_revenue: ['revenue', 'event_date'],
+    })
+  })
+
   it('parses ReplicatedMergeTree (ORDER BY still works)', () => {
     const ddl = `CREATE TABLE analytics.events_replicated
 (

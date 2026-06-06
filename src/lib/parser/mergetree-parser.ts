@@ -141,6 +141,68 @@ function extractProjectionDefinitions(ddl: string): Array<{ name: string; body: 
   return projections
 }
 
+function findConstraintExpressionEnd(input: string, startIndex: number): number {
+  let depth = 0
+  let quote: string | null = null
+
+  for (let i = startIndex; i < input.length; i++) {
+    const ch = input[i]
+
+    if (quote) {
+      if (ch === quote && input[i + 1] === quote) {
+        i++
+      } else if (ch === quote) {
+        quote = null
+      }
+      continue
+    }
+
+    if (ch === "'" || ch === '"' || ch === '`') {
+      quote = ch
+      continue
+    }
+
+    if (ch === '(') {
+      depth++
+      continue
+    }
+
+    if (ch === ')') {
+      if (depth === 0) return i
+      depth--
+      continue
+    }
+
+    if (ch === ',' && depth === 0) {
+      return i
+    }
+  }
+
+  return input.length
+}
+
+function extractConstraintDefinitions(ddl: string): Array<{ name: string; expression: string }> {
+  const constraints: Array<{ name: string; expression: string }> = []
+  const identifier = '`(?:``|[^`])+`|"(?:[^"]|"")+"|[A-Za-z_][\\w$]*'
+  const constraintRe = new RegExp(`\\bCONSTRAINT\\s+(${identifier})\\s+CHECK\\s+`, 'gi')
+  let match: RegExpExecArray | null
+
+  while ((match = constraintRe.exec(ddl)) !== null) {
+    const name = match[1]
+    if (!name) continue
+
+    const expressionStart = constraintRe.lastIndex
+    const expressionEnd = findConstraintExpressionEnd(ddl, expressionStart)
+    constraints.push({
+      name: normalizeIdentifier(name),
+      expression: ddl.slice(expressionStart, expressionEnd).trim(),
+    })
+    constraintRe.lastIndex = expressionEnd + 1
+  }
+
+  return constraints
+}
+
 function hasSelectStar(expr: string): boolean {
   return /\bSELECT\s+(?:[A-Za-z_][\w$]*\s*\.\s*)?\*/i.test(expr)
 }
@@ -202,6 +264,14 @@ export function parseMergeTree(ddl: string, knownColumns: Set<string>): Partial<
       : extractColumnRefs(projection.body, knownColumns)
     if (cols.length > 0) {
       result.projectionColumns[projection.name] = cols
+    }
+  }
+
+  // CONSTRAINT name CHECK expression
+  for (const constraint of extractConstraintDefinitions(ddl)) {
+    const cols = extractColumnRefs(constraint.expression, knownColumns)
+    if (cols.length > 0) {
+      result.constraintColumns[constraint.name] = cols
     }
   }
 
