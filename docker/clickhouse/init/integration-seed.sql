@@ -40,6 +40,11 @@ CREATE TABLE chtopo_it.regions_source
 ENGINE = MergeTree
 ORDER BY region_id;
 
+INSERT INTO chtopo_it.regions_source VALUES
+    (1, 'California', 'US'),
+    (2, 'Ontario', 'CA'),
+    (3, 'Bavaria', 'DE');
+
 CREATE DICTIONARY chtopo_it.regions
 (
     region_id UInt32,
@@ -53,6 +58,8 @@ SOURCE(CLICKHOUSE(
 ))
 LAYOUT(FLAT())
 LIFETIME(MIN 0 MAX 0);
+
+SYSTEM RELOAD DICTIONARY chtopo_it.regions;
 
 CREATE TABLE chtopo_it.daily_stats
 (
