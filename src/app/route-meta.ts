@@ -3,6 +3,7 @@ const routeTitles = [
   { match: (pathname: string) => pathname === '/connect', title: 'Connect' },
   { match: (pathname: string) => pathname === '/tables', title: 'Tables' },
   { match: (pathname: string) => pathname.startsWith('/tables/'), title: 'Table Detail' },
+  { match: (pathname: string) => pathname === '/snapshots', title: 'Schema Snapshots' },
   { match: (pathname: string) => pathname === '/impact', title: 'Impact Analysis' },
   { match: (pathname: string) => pathname === '/playground', title: 'Playground' },
   { match: (pathname: string) => pathname === '/history', title: 'DDL History' },
