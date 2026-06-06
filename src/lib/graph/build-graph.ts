@@ -75,22 +75,121 @@ function getSelectStarSourceTables(starSource: string | null, sourceTables: stri
   return starSource ? [starSource] : sourceTables
 }
 
-function parseDistributedEngine(ddl: string): string | null {
-  // ENGINE = Distributed(cluster, db, table[, sharding_key])
-  const match = /\bDistributed\s*\(\s*'?(\w+)'?\s*,\s*'?(\w+)'?\s*,\s*'?(\w+)'?/i.exec(ddl)
-  if (!match) return null
-  const db = match[2] ?? ''
-  const table = match[3] ?? ''
-  return fqn(db, table)
+function splitEngineArgs(args: string): string[] {
+  const result: string[] = []
+  let current = ''
+  let depth = 0
+  let quote: string | null = null
+
+  for (let i = 0; i < args.length; i++) {
+    const ch = args[i]
+    if (ch === undefined) continue
+
+    if (quote) {
+      current += ch
+      const next = args[i + 1]
+      if (next && ch === quote && next === quote) {
+        current += next
+        i++
+      } else if (ch === quote) {
+        quote = null
+      }
+      continue
+    }
+
+    if (ch === "'" || ch === '"' || ch === '`') {
+      quote = ch
+      current += ch
+      continue
+    }
+
+    if (ch === '(') {
+      depth++
+      current += ch
+      continue
+    }
+
+    if (ch === ')') {
+      depth--
+      current += ch
+      continue
+    }
+
+    if (ch === ',' && depth === 0) {
+      const trimmed = current.trim()
+      if (trimmed) result.push(trimmed)
+      current = ''
+      continue
+    }
+
+    current += ch
+  }
+
+  const trimmed = current.trim()
+  if (trimmed) result.push(trimmed)
+  return result
 }
 
-function parseBufferEngine(ddl: string): string | null {
+function extractEngineArgs(ddl: string, engineName: string): string[] {
+  const match = new RegExp(`\\b${engineName}\\s*\\(`, 'i').exec(ddl)
+  if (!match) return []
+
+  const start = match.index + match[0].length
+  let depth = 1
+  let quote: string | null = null
+
+  for (let i = start; i < ddl.length; i++) {
+    const ch = ddl[i]
+
+    if (quote) {
+      if (ch === quote && ddl[i + 1] === quote) {
+        i++
+      } else if (ch === quote) {
+        quote = null
+      }
+      continue
+    }
+
+    if (ch === "'" || ch === '"' || ch === '`') {
+      quote = ch
+      continue
+    }
+
+    if (ch === '(') depth++
+    if (ch === ')') {
+      depth--
+      if (depth === 0) return splitEngineArgs(ddl.slice(start, i))
+    }
+  }
+
+  return []
+}
+
+function normalizeEngineIdentifier(value: string, fallbackDatabase?: string): string | null {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  if (/^currentDatabase\s*\(\s*\)$/i.test(trimmed)) return fallbackDatabase ?? null
+  if (/^['"`].*['"`]$/.test(trimmed)) {
+    return trimmed.slice(1, -1).replaceAll('``', '`').replaceAll("''", "'").replaceAll('""', '"')
+  }
+  if (/^[A-Za-z_][\w$-]*$/.test(trimmed)) return trimmed
+  return null
+}
+
+function parseDistributedEngine(ddl: string, tableDatabase: string): string | null {
+  // ENGINE = Distributed(cluster, db, table[, sharding_key])
+  const args = extractEngineArgs(ddl, 'Distributed')
+  const db = args[1] ? normalizeEngineIdentifier(args[1], tableDatabase) : null
+  const table = args[2] ? normalizeEngineIdentifier(args[2]) : null
+  return table ? fqn(db ?? '', table) : null
+}
+
+function parseBufferEngine(ddl: string, tableDatabase: string): string | null {
   // ENGINE = Buffer(db, table, layers, ...)
-  const match = /\bBuffer\s*\(\s*'?(\w+)'?\s*,\s*'?(\w+)'?/i.exec(ddl)
-  if (!match) return null
-  const db = match[1] ?? ''
-  const table = match[2] ?? ''
-  return fqn(db, table)
+  const args = extractEngineArgs(ddl, 'Buffer')
+  const db = args[0] ? normalizeEngineIdentifier(args[0], tableDatabase) : null
+  const table = args[1] ? normalizeEngineIdentifier(args[1]) : null
+  return table ? fqn(db ?? '', table) : null
 }
 
 function getDictionarySourceValue(source: string, key: 'db' | 'database' | 'table'): string | null {
@@ -258,7 +357,7 @@ export function buildDependencyGraph(
 
       // Distributed tables
       if (table.engine === 'Distributed') {
-        const localTable = parseDistributedEngine(table.create_table_query)
+        const localTable = parseDistributedEngine(table.create_table_query, table.database)
         if (localTable) {
           graph.distributedTables.set(tableKey, localTable)
         }
@@ -266,7 +365,7 @@ export function buildDependencyGraph(
 
       // Buffer tables
       if (table.engine === 'Buffer') {
-        const destTable = parseBufferEngine(table.create_table_query)
+        const destTable = parseBufferEngine(table.create_table_query, table.database)
         if (destTable) {
           graph.bufferTables.set(tableKey, destTable)
         }
