@@ -96,6 +96,7 @@ classes are documented in [docs/impact-analysis-scope.md](docs/impact-analysis-s
 
 Supported release targets, required ClickHouse permissions, and known limitations
 are tracked in [docs/release-validation-matrix.md](docs/release-validation-matrix.md).
+The final release gate is tracked in [docs/release-checklist.md](docs/release-checklist.md).
 
 ## Stack
 
