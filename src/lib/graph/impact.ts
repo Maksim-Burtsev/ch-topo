@@ -392,5 +392,11 @@ export function analyzeImpact(action: DDLAction, graph: DependencyGraph): Impact
 
     case 'DROP_TABLE':
       return checkDropTableImpacts(action.table, graph)
+
+    case 'RENAME_TABLE':
+      return checkDropTableImpacts(action.table, graph).map((impact) => ({
+        ...impact,
+        reason: `Table rename to ${action.newName}: ${impact.reason}`,
+      }))
   }
 }

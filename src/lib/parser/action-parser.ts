@@ -1,8 +1,243 @@
 import type { DDLAction } from '@/types'
 
-function fqn(db: string | undefined, name: string | undefined): string {
-  if (!name) return ''
-  return db ? `${db}.${name}` : name
+interface TokenResult {
+  value: string
+  end: number
+}
+
+function skipSpace(sql: string, index: number) {
+  let cursor = index
+  while (/\s/u.test(sql[cursor] ?? '')) cursor += 1
+  return cursor
+}
+
+function readQuoted(sql: string, index: number, quote: '`' | '"'): TokenResult | null {
+  let cursor = index + 1
+  let value = ''
+
+  while (cursor < sql.length) {
+    const current = sql[cursor]
+    if (current === undefined) return null
+
+    if (current === quote) {
+      if (sql[cursor + 1] === quote) {
+        value += quote
+        cursor += 2
+        continue
+      }
+
+      return {
+        value,
+        end: cursor + 1,
+      }
+    }
+
+    value += current
+    cursor += 1
+  }
+
+  return null
+}
+
+function readIdentifier(sql: string, index: number): TokenResult | null {
+  const start = skipSpace(sql, index)
+  const current = sql[start]
+
+  if (current === '`' || current === '"') {
+    return readQuoted(sql, start, current)
+  }
+
+  const match = /^[A-Za-z_][\w$]*/u.exec(sql.slice(start))
+  if (!match?.[0]) return null
+
+  return {
+    value: match[0],
+    end: start + match[0].length,
+  }
+}
+
+function readQualifiedName(sql: string, index: number): TokenResult | null {
+  const first = readIdentifier(sql, index)
+  if (!first) return null
+
+  let cursor = skipSpace(sql, first.end)
+  if (sql[cursor] !== '.') return first
+
+  const second = readIdentifier(sql, cursor + 1)
+  if (!second) return null
+
+  cursor = second.end
+  return {
+    value: `${first.value}.${second.value}`,
+    end: cursor,
+  }
+}
+
+function consumeKeyword(sql: string, index: number, keyword: string): number | null {
+  const start = skipSpace(sql, index)
+  const next = sql.slice(start, start + keyword.length)
+  const after = sql[start + keyword.length]
+
+  if (next.toUpperCase() !== keyword.toUpperCase()) return null
+  if (after && /[A-Za-z0-9_$]/u.test(after)) return null
+
+  return start + keyword.length
+}
+
+function consumeKeywordSequence(sql: string, index: number, keywords: string[]): number | null {
+  let cursor = index
+  for (const keyword of keywords) {
+    const next = consumeKeyword(sql, cursor, keyword)
+    if (next === null) return null
+    cursor = next
+  }
+  return cursor
+}
+
+function consumeOptionalIfExists(sql: string, index: number) {
+  return consumeKeywordSequence(sql, index, ['IF', 'EXISTS']) ?? index
+}
+
+function consumeOptionalOnCluster(sql: string, index: number) {
+  const onIndex = consumeKeywordSequence(sql, index, ['ON', 'CLUSTER'])
+  if (onIndex === null) return index
+
+  const cluster = readIdentifier(sql, onIndex)
+  return cluster?.end ?? onIndex
+}
+
+function isEnd(sql: string, index: number) {
+  return skipSpace(sql, index) === sql.length
+}
+
+function hasTopLevelComma(sql: string) {
+  let depth = 0
+  let cursor = 0
+  let quote: '`' | '"' | "'" | null = null
+
+  while (cursor < sql.length) {
+    const current = sql[cursor]
+
+    if (quote) {
+      if (current === quote) {
+        if (sql[cursor + 1] === quote) {
+          cursor += 2
+          continue
+        }
+        quote = null
+      }
+      cursor += 1
+      continue
+    }
+
+    if (current === '`' || current === '"' || current === "'") {
+      quote = current
+      cursor += 1
+      continue
+    }
+
+    if (current === '(') depth += 1
+    if (current === ')') depth = Math.max(0, depth - 1)
+    if (current === ',' && depth === 0) return true
+
+    cursor += 1
+  }
+
+  return false
+}
+
+function stripColumnTypeModifiers(type: string) {
+  const modifierIdx = type.search(
+    /\s+(?:COMMENT|CODEC|DEFAULT|MATERIALIZED|ALIAS|TTL|AFTER|FIRST|SETTINGS)\b/i,
+  )
+  return (modifierIdx === -1 ? type : type.slice(0, modifierIdx)).trim()
+}
+
+function parseDropTable(sql: string): DDLAction | null {
+  let cursor = consumeKeywordSequence(sql, 0, ['DROP', 'TABLE'])
+  if (cursor === null) return null
+
+  cursor = consumeOptionalIfExists(sql, cursor)
+  const table = readQualifiedName(sql, cursor)
+  if (!table) return null
+
+  cursor = consumeOptionalOnCluster(sql, table.end)
+  if (!isEnd(sql, cursor)) return null
+
+  return { type: 'DROP_TABLE', table: table.value }
+}
+
+function parseRenameTable(sql: string): DDLAction | null {
+  let cursor = consumeKeywordSequence(sql, 0, ['RENAME', 'TABLE'])
+  if (cursor === null) return null
+
+  const table = readQualifiedName(sql, cursor)
+  if (!table) return null
+
+  cursor = consumeKeyword(sql, table.end, 'TO')
+  if (cursor === null) return null
+
+  const newName = readQualifiedName(sql, cursor)
+  if (!newName) return null
+
+  cursor = consumeOptionalOnCluster(sql, newName.end)
+  if (!isEnd(sql, cursor)) return null
+
+  return { type: 'RENAME_TABLE', table: table.value, newName: newName.value }
+}
+
+function parseAlterTable(sql: string): DDLAction | null {
+  let cursor = consumeKeywordSequence(sql, 0, ['ALTER', 'TABLE'])
+  if (cursor === null) return null
+
+  cursor = consumeOptionalIfExists(sql, cursor)
+  const table = readQualifiedName(sql, cursor)
+  if (!table) return null
+
+  cursor = consumeOptionalOnCluster(sql, table.end)
+  const rest = sql.slice(cursor).trim()
+  if (!rest || hasTopLevelComma(rest)) return null
+
+  let actionCursor = 0
+  actionCursor = consumeKeywordSequence(rest, actionCursor, ['DROP', 'COLUMN']) ?? -1
+  if (actionCursor >= 0) {
+    actionCursor = consumeOptionalIfExists(rest, actionCursor)
+    const column = readIdentifier(rest, actionCursor)
+    if (!column || !isEnd(rest, column.end)) return null
+    return { type: 'DROP_COLUMN', table: table.value, column: column.value }
+  }
+
+  actionCursor = consumeKeywordSequence(rest, 0, ['RENAME', 'COLUMN']) ?? -1
+  if (actionCursor >= 0) {
+    actionCursor = consumeOptionalIfExists(rest, actionCursor)
+    const oldName = readIdentifier(rest, actionCursor)
+    if (!oldName) return null
+
+    actionCursor = consumeKeyword(rest, oldName.end, 'TO') ?? -1
+    if (actionCursor < 0) return null
+
+    const newName = readIdentifier(rest, actionCursor)
+    if (!newName || !isEnd(rest, newName.end)) return null
+    return {
+      type: 'RENAME_COLUMN',
+      table: table.value,
+      oldName: oldName.value,
+      newName: newName.value,
+    }
+  }
+
+  actionCursor = consumeKeywordSequence(rest, 0, ['MODIFY', 'COLUMN']) ?? -1
+  if (actionCursor >= 0) {
+    actionCursor = consumeOptionalIfExists(rest, actionCursor)
+    const column = readIdentifier(rest, actionCursor)
+    if (!column) return null
+
+    const newType = stripColumnTypeModifiers(rest.slice(column.end).trim())
+    if (!newType) return null
+    return { type: 'MODIFY_COLUMN', table: table.value, column: column.value, newType }
+  }
+
+  return null
 }
 
 /**
@@ -12,52 +247,5 @@ function fqn(db: string | undefined, name: string | undefined): string {
 export function parseAction(sql: string): DDLAction | null {
   const trimmed = sql.trim().replace(/;\s*$/, '')
 
-  // DROP TABLE [IF EXISTS] [db.]table
-  const dropTable = /^\s*DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:`?(\w+)`?\.)?`?(\w+)`?\s*$/i.exec(
-    trimmed,
-  )
-  if (dropTable) {
-    return { type: 'DROP_TABLE', table: fqn(dropTable[1], dropTable[2]) }
-  }
-
-  // ALTER TABLE [IF EXISTS] [db.]table ...
-  const alterMatch = /^\s*ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:`?(\w+)`?\.)?`?(\w+)`?\s+/i.exec(
-    trimmed,
-  )
-  if (!alterMatch) return null
-
-  const table = fqn(alterMatch[1], alterMatch[2])
-  const rest = trimmed.slice(alterMatch[0].length)
-
-  // DROP COLUMN [IF EXISTS] col
-  const dropCol = /^DROP\s+COLUMN\s+(?:IF\s+EXISTS\s+)?`?(\w+)`?\s*$/i.exec(rest)
-  if (dropCol && dropCol[1]) {
-    return { type: 'DROP_COLUMN', table, column: dropCol[1] }
-  }
-
-  // RENAME COLUMN [IF EXISTS] old TO new
-  const renameCol = /^RENAME\s+COLUMN\s+(?:IF\s+EXISTS\s+)?`?(\w+)`?\s+TO\s+`?(\w+)`?\s*$/i.exec(
-    rest,
-  )
-  if (renameCol && renameCol[1] && renameCol[2]) {
-    return { type: 'RENAME_COLUMN', table, oldName: renameCol[1], newName: renameCol[2] }
-  }
-
-  // MODIFY COLUMN [IF EXISTS] col type [modifiers...]
-  const modifyCol = /^MODIFY\s+COLUMN\s+(?:IF\s+EXISTS\s+)?`?(\w+)`?\s+(.+)$/i.exec(rest)
-  if (modifyCol && modifyCol[1] && modifyCol[2]) {
-    // Extract type: everything up to a known modifier keyword
-    let typeStr = modifyCol[2].trim()
-    const modifierIdx = typeStr.search(
-      /\s+(?:COMMENT|CODEC|DEFAULT|MATERIALIZED|ALIAS|TTL|AFTER|FIRST|SETTINGS)\b/i,
-    )
-    if (modifierIdx !== -1) {
-      typeStr = typeStr.slice(0, modifierIdx)
-    }
-    typeStr = typeStr.trim()
-    if (!typeStr) return null
-    return { type: 'MODIFY_COLUMN', table, column: modifyCol[1], newType: typeStr }
-  }
-
-  return null
+  return parseDropTable(trimmed) ?? parseRenameTable(trimmed) ?? parseAlterTable(trimmed)
 }
