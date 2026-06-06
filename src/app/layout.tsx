@@ -28,6 +28,12 @@ const navItems = [
   { path: '/history', icon: History, label: 'History', key: '5' },
 ]
 
+function getModeLabel(mode: 'direct' | 'server' | 'demo') {
+  if (mode === 'demo') return 'Demo'
+  if (mode === 'server') return 'Server'
+  return 'Direct'
+}
+
 export function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -96,7 +102,8 @@ export function Layout() {
     }
   }, [navigate])
 
-  const displayHost = `${host}:${port}`
+  const displayHost = mode === 'demo' ? 'Sample schema' : `${host}:${port}`
+  const modeLabel = getModeLabel(mode)
 
   function handleDisconnect() {
     void disconnect().finally(() => {
@@ -193,7 +200,7 @@ export function Layout() {
               <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
             </span>
             <span className="rounded border border-border px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
-              {mode === 'server' ? 'Server' : 'Direct'}
+              {modeLabel}
             </span>
             {displayHost}
           </div>

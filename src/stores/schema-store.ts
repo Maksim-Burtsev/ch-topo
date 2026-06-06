@@ -17,6 +17,7 @@ import type {
   RawRowPolicyRow,
   RawGrantRow,
 } from '@/lib/clickhouse/types'
+import { getDemoSchema } from '@/lib/mock/demo-schema'
 import type { ConnectionMode } from './connection-store'
 
 type SchemaStatus = 'idle' | 'loading' | 'ready' | 'error'
@@ -80,6 +81,16 @@ export const useSchemaStore = create<SchemaState>((set) => ({
     })
 
     try {
+      if (mode === 'demo') {
+        set({
+          ...getDemoSchema(),
+          tablesReady: true,
+          columnsReady: true,
+          status: 'ready',
+        })
+        return
+      }
+
       if (mode === 'server') {
         const schema = await fetchServerSchema()
         set({

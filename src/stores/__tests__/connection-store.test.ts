@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { connectServerMode, disconnectServerMode } from '@/lib/api/connection'
 import { ping } from '@/lib/clickhouse/client'
 import type { ConnectionParams } from '@/lib/clickhouse/types'
-import { useConnectionStore } from '../connection-store'
+import { type ConnectionMode, useConnectionStore } from '../connection-store'
 
 vi.mock('@/lib/api/connection', () => ({
   connectServerMode: vi.fn().mockResolvedValue(undefined),
@@ -107,6 +107,34 @@ describe('useConnectionStore', () => {
 
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as Record<string, unknown>
     expect(saved).not.toHaveProperty('password')
+  })
+
+  it('connects Demo Mode without calling ClickHouse or the API', async () => {
+    const params: ConnectionParams = {
+      host: 'ignored',
+      port: 8123,
+      database: 'ignored',
+      user: 'ignored',
+      password: 'ignored',
+    }
+
+    await expect(
+      useConnectionStore.getState().connect(params, { mode: 'demo' as ConnectionMode }),
+    ).resolves.toBe(true)
+
+    expect(connectServerMode).not.toHaveBeenCalled()
+    expect(ping).not.toHaveBeenCalled()
+    expect(useConnectionStore.getState()).toMatchObject({
+      host: 'demo',
+      port: 0,
+      database: 'demo',
+      user: 'demo',
+      password: '',
+      mode: 'demo',
+      isConnected: true,
+      error: null,
+    })
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
   })
 
   it('disconnects Server Mode through the API and clears local connection state', async () => {

@@ -171,6 +171,7 @@ test('connect page renders server and direct modes', async ({ page }) => {
 
   await expect(page.getByRole('button', { name: 'Server Mode', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Direct Mode', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Demo Mode', exact: true })).toBeVisible()
   await expect(page.locator('form input')).toHaveCount(5)
   const inputValues = await page.locator('form input').evaluateAll((inputs) =>
     inputs.map((input) => {
@@ -179,6 +180,21 @@ test('connect page renders server and direct modes', async ({ page }) => {
     }),
   )
   expect(inputValues).toEqual(['localhost', '8123', 'default', 'default', ''])
+  expectNoUnexpectedRuntimeErrors(errors)
+})
+
+test('demo mode renders bundled graph without a ClickHouse connection', async ({ page }) => {
+  const errors = collectRuntimeErrors(page)
+
+  await page.goto('/#/connect')
+  await page.getByRole('button', { name: 'Demo Mode', exact: true }).click()
+  await page.getByRole('button', { name: 'Explore Demo Mode' }).click()
+
+  await expect(page).toHaveURL(/#\/$/)
+  await expect(page.locator('header')).toContainText('Demo')
+  await expect(page.locator('header')).toContainText('Sample schema')
+  await expect(page.locator('.react-flow')).toBeVisible()
+  await expect(page.getByText('daily_stats_mv')).toBeVisible()
   expectNoUnexpectedRuntimeErrors(errors)
 })
 

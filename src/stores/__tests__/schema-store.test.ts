@@ -9,6 +9,7 @@ import {
   fetchTables,
 } from '@/lib/clickhouse/queries'
 import type { ConnectionParams, RawColumnRow, RawTableRow } from '@/lib/clickhouse/types'
+import type { ConnectionMode } from '../connection-store'
 import { useSchemaStore } from '../schema-store'
 
 vi.mock('@/lib/api/schema', () => ({
@@ -126,6 +127,23 @@ describe('useSchemaStore', () => {
       tables: [{ database: 'analytics', name: 'events' }],
       warnings: [{ source: 'grants', message: 'grants denied' }],
     })
+  })
+
+  it('loads bundled Demo Mode schema without ClickHouse or backend API calls', async () => {
+    await useSchemaStore.getState().loadSchema(params, { mode: 'demo' as ConnectionMode })
+
+    expect(fetchServerSchema).not.toHaveBeenCalled()
+    expect(fetchTables).not.toHaveBeenCalled()
+    expect(fetchColumns).not.toHaveBeenCalled()
+    expect(useSchemaStore.getState()).toMatchObject({
+      status: 'ready',
+      error: null,
+      tablesReady: true,
+      columnsReady: true,
+      warnings: [],
+    })
+    expect(useSchemaStore.getState().tables.length).toBeGreaterThan(0)
+    expect(useSchemaStore.getState().columns.length).toBeGreaterThan(0)
   })
 
   it('treats tables and columns as critical collections', async () => {

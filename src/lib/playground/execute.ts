@@ -36,7 +36,7 @@ export interface ExecuteOptions {
   signal?: AbortSignal
   readOnlyMode?: boolean
   confirmedMutating?: boolean
-  connectionMode?: 'direct' | 'server'
+  connectionMode?: 'direct' | 'server' | 'demo'
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000
@@ -206,6 +206,17 @@ export async function executeQuery(
       rowsRead: 0,
       bytesRead: 0,
       error: safety.message,
+    }
+  }
+
+  if (options?.connectionMode === 'demo') {
+    return {
+      columns: [],
+      rows: [],
+      elapsed: 0,
+      rowsRead: 0,
+      bytesRead: 0,
+      error: 'Demo Mode cannot execute queries. Connect to ClickHouse to run SQL.',
     }
   }
 

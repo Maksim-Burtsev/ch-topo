@@ -412,6 +412,7 @@ export function PlaygroundPage() {
   const hasResults = result !== null || explainResult !== null
   const isRunning = queryState.status === 'running'
   const sessionExpired = result?.sessionExpired === true || explainResult?.sessionExpired === true
+  const isDemoMode = connectionMode === 'demo'
 
   return (
     <div ref={containerRef} className="flex h-full flex-col overflow-hidden -m-6">
@@ -435,8 +436,8 @@ export function PlaygroundPage() {
           onClick={() => {
             handleExecute()
           }}
-          disabled={isRunning || !sql.trim()}
-          title={`Execute (${modKey}+Enter)`}
+          disabled={isRunning || !sql.trim() || isDemoMode}
+          title={isDemoMode ? 'Demo Mode cannot execute queries' : `Execute (${modKey}+Enter)`}
           className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
         >
           <Play className="h-3 w-3" />
@@ -577,6 +578,13 @@ export function PlaygroundPage() {
           {cappedMessage && (
             <div className="border-b border-border bg-yellow-500/10 px-3 py-1 text-xs text-yellow-600 dark:text-yellow-400">
               {cappedMessage}
+            </div>
+          )}
+
+          {isDemoMode && (
+            <div className="border-b border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-700 dark:text-sky-300">
+              Demo Mode uses a bundled sample schema. Connect to a real ClickHouse instance to run
+              SQL or EXPLAIN.
             </div>
           )}
 
