@@ -1,5 +1,12 @@
-import Editor, { type OnMount } from '@monaco-editor/react'
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react'
+import {
+  lazy,
+  Suspense,
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+} from 'react'
 import {
   buildSchemaLookup,
   registerSqlCompletionProvider,
@@ -7,6 +14,11 @@ import {
 } from '@/lib/playground/autocomplete'
 import { useSchemaStore } from '@/stores/schema-store'
 import { useThemeStore } from '@/stores/theme-store'
+import type { MonacoEditorOnMount } from './monaco-editor-view'
+
+const MonacoEditorView = lazy(() =>
+  import('./monaco-editor-view').then((mod) => ({ default: mod.MonacoEditorView })),
+)
 
 export interface SqlEditorHandle {
   /** Returns selected text, or null if no selection */
@@ -26,7 +38,7 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(function Sq
   ref,
 ) {
   const theme = useThemeStore((s) => s.theme)
-  const editorRef = useRef<Parameters<OnMount>[0] | null>(null)
+  const editorRef = useRef<Parameters<MonacoEditorOnMount>[0] | null>(null)
   const schemaRef = useRef<SchemaDatabase[]>([])
   const disposableRef = useRef<{ dispose: () => void } | null>(null)
 
@@ -58,7 +70,7 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(function Sq
     },
   }))
 
-  const handleMount: OnMount = useCallback((editor, monaco) => {
+  const handleMount: MonacoEditorOnMount = useCallback((editor, monaco) => {
     editorRef.current = editor
     editor.focus()
 
@@ -83,24 +95,21 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(function Sq
 
   return (
     <div className={className} style={{ flex: 1, minHeight: 0 }}>
-      <Editor
-        language="sql"
-        theme={theme === 'dark' ? 'vs-dark' : 'light'}
-        value={value}
-        onChange={handleChange}
-        onMount={handleMount}
-        options={{
-          minimap: { enabled: false },
-          lineNumbers: 'on',
-          wordWrap: 'on',
-          fontSize: 14,
-          fontFamily: 'monospace',
-          scrollBeyondLastLine: false,
-          automaticLayout: true,
-          tabSize: 2,
-          padding: { top: 8 },
-        }}
-      />
+      <Suspense
+        fallback={
+          <div className="flex h-full min-h-0 items-center justify-center bg-card text-sm text-muted-foreground">
+            Loading editor...
+          </div>
+        }
+      >
+        <MonacoEditorView
+          language="sql"
+          theme={theme === 'dark' ? 'vs-dark' : 'light'}
+          value={value}
+          onChange={handleChange}
+          onMount={handleMount}
+        />
+      </Suspense>
     </div>
   )
 })

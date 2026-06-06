@@ -1,29 +1,46 @@
+import { Suspense, type ComponentType } from 'react'
 import { createHashRouter } from 'react-router'
-import { ConnectPage } from '@/pages/connect-page'
-import { GraphPage } from '@/pages/graph-page'
-import { HistoryPage } from '@/pages/history-page'
-import { ImpactPage } from '@/pages/impact-page'
-import { NotFoundPage } from '@/pages/not-found-page'
-import { PlaygroundPage } from '@/pages/playground-page'
-import { TableDetailPage } from '@/pages/tables/table-detail-page'
-import { TablesPage } from '@/pages/tables/tables-page'
 import { Layout } from './layout'
+import {
+  ConnectPage,
+  GraphPage,
+  HistoryPage,
+  ImpactPage,
+  NotFoundPage,
+  PlaygroundPage,
+  TableDetailPage,
+  TablesPage,
+} from './lazy-pages'
+
+function routeElement(Page: ComponentType) {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+          Loading...
+        </div>
+      }
+    >
+      <Page />
+    </Suspense>
+  )
+}
 
 export const router = createHashRouter([
   {
     path: '/connect',
-    element: <ConnectPage />,
+    element: routeElement(ConnectPage),
   },
   {
     element: <Layout />,
     children: [
-      { path: '/', element: <GraphPage /> },
-      { path: '/tables', element: <TablesPage /> },
-      { path: '/tables/:database/:name', element: <TableDetailPage /> },
-      { path: '/impact', element: <ImpactPage /> },
-      { path: '/playground', element: <PlaygroundPage /> },
-      { path: '/history', element: <HistoryPage /> },
-      { path: '*', element: <NotFoundPage /> },
+      { path: '/', element: routeElement(GraphPage) },
+      { path: '/tables', element: routeElement(TablesPage) },
+      { path: '/tables/:database/:name', element: routeElement(TableDetailPage) },
+      { path: '/impact', element: routeElement(ImpactPage) },
+      { path: '/playground', element: routeElement(PlaygroundPage) },
+      { path: '/history', element: routeElement(HistoryPage) },
+      { path: '*', element: routeElement(NotFoundPage) },
     ],
   },
 ])
