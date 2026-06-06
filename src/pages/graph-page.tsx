@@ -20,6 +20,7 @@ import { DictDetailPanel } from '@/components/graph/dict-detail-panel'
 import { SchemaNode } from '@/components/graph/schema-node'
 import { TableDetailPanel } from '@/components/graph/table-detail-panel'
 import { DatabaseFilter } from '@/components/shared/database-filter'
+import { SchemaDataNotice } from '@/components/shared/schema-data-notice'
 import type { RawTableRow } from '@/lib/clickhouse/types'
 import { getEffectiveDatabase } from '@/lib/database-utils'
 import { alignOneToOnePairs, attachParentIds, filterDictTables } from '@/lib/graph/layout-utils'
@@ -743,6 +744,8 @@ function GraphPageInner() {
   const allIndices = useSchemaStore((s) => s.indices)
   const dictionaries = useSchemaStore((s) => s.dictionaries)
   const tablesReady = useSchemaStore((s) => s.tablesReady)
+  const columnsReady = useSchemaStore((s) => s.columnsReady)
+  const schemaWarnings = useSchemaStore((s) => s.warnings)
   const schemaStatus = useSchemaStore((s) => s.status)
   const loadSchema = useSchemaStore((s) => s.loadSchema)
   const getParams = useConnectionStore((s) => s.getParams)
@@ -1095,12 +1098,21 @@ function GraphPageInner() {
           <Map size={14} />
         </button>
 
-        {/* Empty state: no MVs */}
-        {allComputedNodes.length > 0 && !hasMVs && (
-          <div className="absolute top-3 right-3 z-10 rounded-lg border border-border bg-card/90 backdrop-blur px-3 py-2 text-xs text-muted-foreground max-w-[220px]">
-            No materialized views — graph shows tables only.
-          </div>
-        )}
+        <div className="absolute top-3 right-3 z-10 flex max-w-[300px] flex-col gap-2">
+          <SchemaDataNotice
+            status={schemaStatus}
+            tablesReady={tablesReady}
+            columnsReady={columnsReady}
+            warnings={schemaWarnings}
+          />
+
+          {/* Empty state: no MVs */}
+          {allComputedNodes.length > 0 && !hasMVs && (
+            <div className="rounded-lg border border-border bg-card/90 px-3 py-2 text-xs text-muted-foreground backdrop-blur">
+              No materialized views — graph shows tables only.
+            </div>
+          )}
+        </div>
 
         {/* Empty state: no tables */}
         {allComputedNodes.length === 0 && (

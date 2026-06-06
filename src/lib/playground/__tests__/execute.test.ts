@@ -272,4 +272,62 @@ describe('executeQuery', () => {
     const result = await executeQuery('SELECT 1', params)
     expect(result.error).toBe('HTTP 500')
   })
+
+  it('runs queries through the server API in Server Mode', async () => {
+    const resultBody = {
+      columns: [{ name: 'n', type: 'UInt64' }],
+      rows: [{ n: 1 }],
+      elapsed: 0.01,
+      rowsRead: 1,
+      bytesRead: 8,
+    }
+
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify(resultBody), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+
+    const result = await executeQuery('SELECT 1', params, {
+      connectionMode: 'server',
+      readOnlyMode: false,
+      confirmedMutating: true,
+      timeoutMs: 1234,
+    })
+
+    expect(result).toEqual(resultBody)
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/query',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sql: 'SELECT 1',
+          timeoutMs: 1234,
+          readOnly: false,
+          confirmedMutating: true,
+        }),
+      }),
+    )
+  })
+
+  it('returns a reconnect state when the server session expires', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ error: { message: 'Not connected', statusCode: 401 } }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+
+    const result = await executeQuery('SELECT 1', params, { connectionMode: 'server' })
+
+    expect(result.sessionExpired).toBe(true)
+    expect(result.error).toBe(
+      'Server session expired. Reconnect to ClickHouse and run the query again.',
+    )
+    expect(result.columns).toEqual([])
+    expect(result.rows).toEqual([])
+  })
 })

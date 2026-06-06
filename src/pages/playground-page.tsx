@@ -9,6 +9,7 @@ import {
   TriangleAlert,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { ExplainView } from '@/components/playground/explain-view'
 import { QueryHistory } from '@/components/playground/query-history'
 import { QueryStats, type QueryState } from '@/components/playground/query-stats'
@@ -111,6 +112,9 @@ export function PlaygroundPage() {
   const readOnlyMode = usePlaygroundStore((s) => s.readOnlyMode)
   const toggleReadOnlyMode = usePlaygroundStore((s) => s.toggleReadOnlyMode)
   const getParams = useConnectionStore((s) => s.getParams)
+  const connectionMode = useConnectionStore((s) => s.mode)
+  const disconnect = useConnectionStore((s) => s.disconnect)
+  const navigate = useNavigate()
 
   const [queryState, setQueryState] = useState<QueryState>({ status: 'idle' })
   const [result, setResult] = useState<QueryResult | null>(null)
@@ -194,6 +198,7 @@ export function PlaygroundPage() {
         signal: controller.signal,
         readOnlyMode,
         confirmedMutating: intent?.confirmedMutating,
+        connectionMode,
       }).then(
         (res) => {
           if (controller.signal.aborted) return
@@ -226,7 +231,7 @@ export function PlaygroundPage() {
         },
       )
     },
-    [getActiveStatement, getParams, readOnlyMode],
+    [connectionMode, getActiveStatement, getParams, readOnlyMode],
   )
 
   // ── Explain ────────────────────────────────────────────────
@@ -249,7 +254,7 @@ export function PlaygroundPage() {
         },
       })
 
-      explainQuery(stmt, getParams(), mode, { signal: controller.signal }).then(
+      explainQuery(stmt, getParams(), mode, { signal: controller.signal, connectionMode }).then(
         (res) => {
           if (controller.signal.aborted) return
           setExplainResult(res)
@@ -272,7 +277,7 @@ export function PlaygroundPage() {
         () => {},
       )
     },
-    [getActiveStatement, getParams],
+    [connectionMode, getActiveStatement, getParams],
   )
 
   const handleExplainModeChange = useCallback(
@@ -304,6 +309,19 @@ export function PlaygroundPage() {
     setPendingMutatingQuery(null)
     setQueryState({ status: 'idle' })
   }, [])
+
+  const handleReconnect = useCallback(() => {
+    abortRef.current?.abort()
+    setResult(null)
+    setCappedMessage(null)
+    setExplainResult(null)
+    setPendingMutatingQuery(null)
+    setQueryState({ status: 'idle' })
+
+    void disconnect().finally(() => {
+      void navigate('/connect')
+    })
+  }, [disconnect, navigate])
 
   // ── History ────────────────────────────────────────────────
 
@@ -393,6 +411,7 @@ export function PlaygroundPage() {
   const modKey = isMac() ? '⌘' : 'Ctrl'
   const hasResults = result !== null || explainResult !== null
   const isRunning = queryState.status === 'running'
+  const sessionExpired = result?.sessionExpired === true || explainResult?.sessionExpired === true
 
   return (
     <div ref={containerRef} className="flex h-full flex-col overflow-hidden -m-6">
@@ -558,6 +577,22 @@ export function PlaygroundPage() {
           {cappedMessage && (
             <div className="border-b border-border bg-yellow-500/10 px-3 py-1 text-xs text-yellow-600 dark:text-yellow-400">
               {cappedMessage}
+            </div>
+          )}
+
+          {sessionExpired && (
+            <div className="flex items-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+              <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
+              <span className="min-w-0 flex-1">
+                Server session expired. Reconnect to ClickHouse to continue running queries.
+              </span>
+              <button
+                type="button"
+                onClick={handleReconnect}
+                className="rounded-md bg-amber-600 px-2.5 py-1 font-medium text-white transition-colors hover:bg-amber-700"
+              >
+                Reconnect
+              </button>
             </div>
           )}
 

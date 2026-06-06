@@ -17,6 +17,7 @@ export interface QueryResult {
   bytesRead: number
   error?: string
   errorLine?: number
+  sessionExpired?: boolean
 }
 
 interface ClickHouseJsonResponse {
@@ -35,9 +36,19 @@ export interface ExecuteOptions {
   signal?: AbortSignal
   readOnlyMode?: boolean
   confirmedMutating?: boolean
+  connectionMode?: 'direct' | 'server'
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000
+
+interface QueryApiErrorBody {
+  error?: unknown
+}
+
+interface QueryApiErrorPayload {
+  message?: unknown
+  errorLine?: unknown
+}
 
 // ── Error parsing ──────────────────────────────────────────────
 
@@ -68,6 +79,113 @@ export function parseSummaryHeader(header: string | null): ClickHouseSummary | u
   }
 }
 
+function isQueryApiErrorPayload(value: unknown): value is QueryApiErrorPayload {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+async function readServerQueryError(response: Response): Promise<{
+  message: string
+  errorLine?: number
+  sessionExpired: boolean
+}> {
+  if (response.status === 401) {
+    return {
+      message: 'Server session expired. Reconnect to ClickHouse and run the query again.',
+      sessionExpired: true,
+    }
+  }
+
+  try {
+    const body = (await response.json()) as QueryApiErrorBody
+    const error = body.error
+
+    if (isQueryApiErrorPayload(error) && typeof error.message === 'string') {
+      return {
+        message: error.message,
+        errorLine: typeof error.errorLine === 'number' ? error.errorLine : undefined,
+        sessionExpired: false,
+      }
+    }
+
+    if (typeof error === 'string' && error.trim()) {
+      return { message: error, sessionExpired: false }
+    }
+  } catch {
+    // Fall back to HTTP status below.
+  }
+
+  return { message: `HTTP ${response.status}`, sessionExpired: false }
+}
+
+async function executeServerQuery(sql: string, options?: ExecuteOptions): Promise<QueryResult> {
+  let response: Response
+
+  try {
+    response = await fetch('/api/query', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        sql,
+        timeoutMs: options?.timeoutMs,
+        readOnly: options?.readOnlyMode ?? true,
+        confirmedMutating: options?.confirmedMutating,
+      }),
+      signal: options?.signal,
+    })
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      return {
+        columns: [],
+        rows: [],
+        elapsed: 0,
+        rowsRead: 0,
+        bytesRead: 0,
+        error: 'Query cancelled',
+      }
+    }
+
+    if (err instanceof TypeError) {
+      return {
+        columns: [],
+        rows: [],
+        elapsed: 0,
+        rowsRead: 0,
+        bytesRead: 0,
+        error:
+          'Network error: Cannot reach the ch-topo API. Check that the local API server is running.',
+      }
+    }
+
+    return {
+      columns: [],
+      rows: [],
+      elapsed: 0,
+      rowsRead: 0,
+      bytesRead: 0,
+      error: err instanceof Error ? err.message : 'Failed to execute query',
+    }
+  }
+
+  if (!response.ok) {
+    const error = await readServerQueryError(response)
+    return {
+      columns: [],
+      rows: [],
+      elapsed: 0,
+      rowsRead: 0,
+      bytesRead: 0,
+      error: error.message,
+      errorLine: error.errorLine,
+      sessionExpired: error.sessionExpired,
+    }
+  }
+
+  return (await response.json()) as QueryResult
+}
+
 // ── Execute query ──────────────────────────────────────────────
 
 export async function executeQuery(
@@ -89,6 +207,10 @@ export async function executeQuery(
       bytesRead: 0,
       error: safety.message,
     }
+  }
+
+  if (options?.connectionMode === 'server') {
+    return executeServerQuery(sql, options)
   }
 
   const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS
