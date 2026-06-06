@@ -11,18 +11,22 @@ import {
   TableDetailPage,
   TablesPage,
 } from './lazy-pages'
+import { RouteDocumentTitle } from './route-document-title'
 
 function routeElement(Page: ComponentType) {
   return (
-    <Suspense
-      fallback={
-        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-          Loading...
-        </div>
-      }
-    >
-      <Page />
-    </Suspense>
+    <>
+      <RouteDocumentTitle />
+      <Suspense
+        fallback={
+          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+            Loading...
+          </div>
+        }
+      >
+        <Page />
+      </Suspense>
+    </>
   )
 }
 
