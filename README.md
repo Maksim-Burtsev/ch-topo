@@ -92,6 +92,11 @@ Impact analysis is static schema analysis, not a ClickHouse execution guarantee.
 Supported DDL actions, unsupported SQL constructs, and known false-negative
 classes are documented in [docs/impact-analysis-scope.md](docs/impact-analysis-scope.md).
 
+## Release Validation
+
+Supported release targets, required ClickHouse permissions, and known limitations
+are tracked in [docs/release-validation-matrix.md](docs/release-validation-matrix.md).
+
 ## Stack
 
 - React 19 + TypeScript
