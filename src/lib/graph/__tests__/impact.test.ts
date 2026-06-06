@@ -144,6 +144,59 @@ describe('DROP COLUMN', () => {
     expect(indexWarning?.objectName).toBe('idx_user')
   })
 
+  it('detects projection column warnings from parsed table DDL', () => {
+    const tables: RawTableRow[] = [
+      {
+        database: 'analytics',
+        name: 'events',
+        engine: 'MergeTree',
+        total_rows: '0',
+        total_bytes: '0',
+        data_compressed_bytes: '0',
+        create_table_query: `CREATE TABLE analytics.events
+(
+    event_date Date,
+    user_id UInt64,
+    revenue Decimal(18, 2),
+    PROJECTION user_revenue_projection
+    (
+        SELECT user_id, sum(revenue) AS total_revenue
+        GROUP BY user_id
+    )
+)
+ENGINE = MergeTree
+ORDER BY event_date`,
+        sorting_key: '',
+        partition_key: '',
+        metadata_modification_time: '2026-03-15 00:00:00',
+      },
+    ]
+    const columns: RawColumnRow[] = ['event_date', 'user_id', 'revenue'].map((name) => ({
+      database: 'analytics',
+      table: 'events',
+      name,
+      type: name === 'revenue' ? 'Decimal(18, 2)' : 'UInt64',
+      default_kind: '',
+      default_expression: '',
+      compression_codec: '',
+      data_compressed_bytes: '0',
+      data_uncompressed_bytes: '0',
+    }))
+    const graph = buildDependencyGraph(tables, columns, [], [], [], [])
+
+    const impacts = analyzeImpact(
+      { type: 'DROP_COLUMN', table: 'analytics.events', column: 'revenue' },
+      graph,
+    )
+
+    const projectionWarning = impacts.find(
+      (impact) => impact.severity === 'warning' && impact.objectType === 'projection',
+    )
+    expect(projectionWarning).toBeDefined()
+    expect(projectionWarning?.objectName).toBe('user_revenue_projection')
+    expect(projectionWarning?.column).toBe('revenue')
+  })
+
   it('detects column grant warnings', () => {
     const grants: RawGrantRow[] = [
       {

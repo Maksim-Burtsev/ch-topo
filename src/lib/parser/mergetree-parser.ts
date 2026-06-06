@@ -75,6 +75,76 @@ function extractIdentifiers(expr: string): string[] {
   return matches ?? []
 }
 
+function findMatchingParen(input: string, openIndex: number): number {
+  let depth = 0
+  let quote: string | null = null
+
+  for (let i = openIndex; i < input.length; i++) {
+    const ch = input[i]
+
+    if (quote) {
+      if (ch === quote && input[i + 1] === quote) {
+        i++
+      } else if (ch === quote) {
+        quote = null
+      }
+      continue
+    }
+
+    if (ch === "'" || ch === '"' || ch === '`') {
+      quote = ch
+      continue
+    }
+
+    if (ch === '(') {
+      depth++
+    } else if (ch === ')') {
+      depth--
+      if (depth === 0) return i
+    }
+  }
+
+  return -1
+}
+
+function normalizeIdentifier(identifier: string): string {
+  if (identifier.startsWith('`') && identifier.endsWith('`')) {
+    return identifier.slice(1, -1).replaceAll('``', '`')
+  }
+  if (identifier.startsWith('"') && identifier.endsWith('"')) {
+    return identifier.slice(1, -1).replaceAll('""', '"')
+  }
+  return identifier
+}
+
+function extractProjectionDefinitions(ddl: string): Array<{ name: string; body: string }> {
+  const projections: Array<{ name: string; body: string }> = []
+  const identifier = '`(?:``|[^`])+`|"(?:[^"]|"")+"|[A-Za-z_][\\w$]*'
+  const projectionRe = new RegExp(`\\bPROJECTION\\s+(${identifier})\\s*\\(`, 'gi')
+  let match: RegExpExecArray | null
+
+  while ((match = projectionRe.exec(ddl)) !== null) {
+    const name = match[1]
+    if (!name) continue
+
+    const openIndex = projectionRe.lastIndex - 1
+    const closeIndex = findMatchingParen(ddl, openIndex)
+    if (closeIndex === -1) continue
+
+    projections.push({
+      name: normalizeIdentifier(name),
+      body: ddl.slice(openIndex + 1, closeIndex),
+    })
+    projectionRe.lastIndex = closeIndex + 1
+  }
+
+  return projections
+}
+
+function hasSelectStar(expr: string): boolean {
+  return /\bSELECT\s+(?:[A-Za-z_][\w$]*\s*\.\s*)?\*/i.test(expr)
+}
+
 const CLAUSE_TERMINATORS =
   /\b(?:ORDER\s+BY|PARTITION\s+BY|PRIMARY\s+KEY|SAMPLE\s+BY|TTL|SETTINGS|ENGINE)\b/i
 
@@ -123,6 +193,16 @@ export function parseMergeTree(ddl: string, knownColumns: Set<string>): Partial<
   if (sampleExpr) {
     const cols = extractColumnRefs(sampleExpr, knownColumns)
     result.sampleByColumn = cols[0] ?? null
+  }
+
+  // PROJECTION name (SELECT ...)
+  for (const projection of extractProjectionDefinitions(ddl)) {
+    const cols = hasSelectStar(projection.body)
+      ? Array.from(knownColumns)
+      : extractColumnRefs(projection.body, knownColumns)
+    if (cols.length > 0) {
+      result.projectionColumns[projection.name] = cols
+    }
   }
 
   // SETTINGS

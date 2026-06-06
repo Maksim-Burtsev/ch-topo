@@ -472,6 +472,57 @@ describe('MergeTree internal dependencies', () => {
     const graph = buildDefault()
     expect(graph.orderByColumns.get('analytics.users')).toEqual(['user_id'])
   })
+
+  it('extracts projection column dependencies from MergeTree DDL', () => {
+    const tables: RawTableRow[] = [
+      {
+        database: 'analytics',
+        name: 'events',
+        engine: 'MergeTree',
+        total_rows: '0',
+        total_bytes: '0',
+        data_compressed_bytes: '0',
+        create_table_query: `CREATE TABLE analytics.events
+(
+    event_date Date,
+    event_time DateTime,
+    user_id UInt64,
+    revenue Decimal(18, 2),
+    PROJECTION user_revenue_projection
+    (
+        SELECT user_id, toDate(event_time) AS event_day, sum(revenue) AS total_revenue
+        GROUP BY user_id, event_day
+    )
+)
+ENGINE = MergeTree
+ORDER BY (event_date, user_id)`,
+        sorting_key: '',
+        partition_key: '',
+        metadata_modification_time: '2026-03-15 00:00:00',
+      },
+    ]
+    const columns: RawColumnRow[] = ['event_date', 'event_time', 'user_id', 'revenue'].map(
+      (name) => ({
+        database: 'analytics',
+        table: 'events',
+        name,
+        type: name === 'revenue' ? 'Decimal(18, 2)' : 'UInt64',
+        default_kind: '',
+        default_expression: '',
+        compression_codec: '',
+        data_compressed_bytes: '0',
+        data_uncompressed_bytes: '0',
+      }),
+    )
+
+    const graph = buildDependencyGraph(tables, columns, [], [], [], [])
+
+    expect(graph.projectionColumns.get('analytics.events.user_revenue_projection')).toEqual([
+      'user_id',
+      'event_time',
+      'revenue',
+    ])
+  })
 })
 
 // ─── Dictionary Sources ───────────────────────────────────────────────
