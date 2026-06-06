@@ -340,15 +340,20 @@ function addRefs(
   knownColumnsByTable: Map<string, Set<string>>,
 ): void {
   const identifier = '`(?:``|[^`])+`|"(?:[^"]|"")+"|[A-Za-z_][\\w$]*'
-  const tokenRe = new RegExp(`(?:(${identifier})\\s*\\.\\s*)?(${identifier})`, 'g')
+  const identifierGroup = `(?:${identifier})`
+  const tokenRe = new RegExp(`${identifierGroup}(?:\\s*\\.\\s*${identifierGroup})*`, 'g')
+  const partRe = new RegExp(identifierGroup, 'g')
   const seen = new Set<string>()
   let match: RegExpExecArray | null
 
   while ((match = tokenRe.exec(clause)) !== null) {
-    const col = normalizeIdentifier(match[2])
+    const parts = Array.from(match[0].matchAll(partRe), (part) =>
+      normalizeIdentifier(part[0]),
+    ).filter((part): part is string => Boolean(part))
+    const col = parts[parts.length - 1]
     if (!col || !knownColumns.has(col)) continue
 
-    const qualifier = normalizeIdentifier(match[1])
+    const qualifier = parts.length > 1 ? parts.slice(0, -1).join('.') : null
     const sourceTable = resolveColumnSource(
       col,
       qualifier,
