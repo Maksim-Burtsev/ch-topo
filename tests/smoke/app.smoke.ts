@@ -158,6 +158,7 @@ test('app loads and lands on connect without a session', async ({ page }) => {
   await page.goto('/')
 
   await expect(page).toHaveURL(/#\/connect$/)
+  await expect(page).toHaveTitle('chtopo — Connect')
   await expect(page.getByRole('heading', { name: 'Connect to ClickHouse' })).toBeVisible()
   await expect(page.locator('#root')).not.toBeEmpty()
   expectNoUnexpectedRuntimeErrors(errors)
@@ -223,6 +224,7 @@ test('seeded server-mode schema renders the graph', async ({ page }) => {
   await page.getByRole('button', { name: 'Connect via Server Mode' }).click()
 
   await expect(page).toHaveURL(/#\/$/)
+  await expect(page).toHaveTitle('chtopo — Schema Graph')
   await expect(page.locator('.react-flow')).toBeVisible()
   await expect(page.getByText('daily_stats_mv')).toBeVisible()
   expect(await page.locator('.react-flow__node').count()).toBeGreaterThan(0)

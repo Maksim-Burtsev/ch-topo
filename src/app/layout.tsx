@@ -18,6 +18,7 @@ import { useGraphStore } from '@/stores/graph-store'
 import { useHistoryStore } from '@/stores/history-store'
 import { useSchemaStore } from '@/stores/schema-store'
 import { useThemeStore } from '@/stores/theme-store'
+import { getRouteTitle } from './route-meta'
 
 const navItems = [
   { path: '/', icon: Workflow, label: 'Graph', key: '1' },
@@ -27,20 +28,10 @@ const navItems = [
   { path: '/history', icon: History, label: 'History', key: '5' },
 ]
 
-function getPageTitle(pathname: string): string {
-  if (pathname === '/') return 'Schema Graph'
-  if (pathname === '/tables') return 'Tables'
-  if (pathname.startsWith('/tables/')) return 'Table Detail'
-  if (pathname === '/impact') return 'Impact Analysis'
-  if (pathname === '/playground') return 'Playground'
-  if (pathname === '/history') return 'DDL History'
-  return 'chtopo'
-}
-
 export function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
-  const title = getPageTitle(location.pathname)
+  const title = getRouteTitle(location.pathname)
   const { host, port, isConnected, disconnect, mode } = useConnectionStore()
   const schemaStatus = useSchemaStore((s) => s.status)
   const schemaWarnings = useSchemaStore((s) => s.warnings)
@@ -74,11 +65,6 @@ export function Layout() {
       void useSchemaStore.getState().loadSchema(params, { mode })
     }
   }, [isConnected, mode, schemaStatus])
-
-  // Document title
-  useEffect(() => {
-    document.title = title === 'Playground' ? 'Playground — chtopo' : `chtopo — ${title}`
-  }, [title])
 
   // Keyboard shortcuts: 1-5 nav, / focus search, Esc
   useEffect(() => {
