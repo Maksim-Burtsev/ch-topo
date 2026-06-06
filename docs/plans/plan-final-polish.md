@@ -23,7 +23,7 @@
 ### Task 3: Empty states audit
 - [ ] Tables: "No tables found in this database"
 - [ ] Graph: "No materialized views — graph shows tables only" (still show table nodes)
-- [ ] Impact: "Safe to execute" green card when no deps affected
+- [ ] Impact: "No known impacts detected within supported scope" card when no deps are affected
 - [ ] History: "No DDL history found. Check query_log settings."
 - [ ] Migrations: explanation that it's optional
 - [ ] Playground: "Write a query and press Ctrl+Enter"
