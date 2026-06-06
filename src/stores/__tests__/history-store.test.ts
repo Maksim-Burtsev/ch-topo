@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchServerHistory } from '@/lib/api/history'
 import { fetchDDLHistory } from '@/lib/clickhouse/queries'
 import type { ConnectionParams, RawDDLHistoryRow } from '@/lib/clickhouse/types'
+import type { ConnectionMode } from '../connection-store'
 import { useHistoryStore } from '../history-store'
 
 vi.mock('@/lib/api/history', () => ({
@@ -70,5 +71,14 @@ describe('useHistoryStore', () => {
       status: 'ready',
       entries: [historyRow],
     })
+  })
+
+  it('loads bundled Demo Mode history without ClickHouse or backend API calls', async () => {
+    await useHistoryStore.getState().loadHistory(params, { mode: 'demo' as ConnectionMode })
+
+    expect(fetchServerHistory).not.toHaveBeenCalled()
+    expect(fetchDDLHistory).not.toHaveBeenCalled()
+    expect(useHistoryStore.getState().status).toBe('ready')
+    expect(useHistoryStore.getState().entries.length).toBeGreaterThan(0)
   })
 })

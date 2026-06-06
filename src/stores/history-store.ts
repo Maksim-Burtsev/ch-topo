@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { fetchServerHistory } from '@/lib/api/history'
 import { fetchDDLHistory } from '@/lib/clickhouse/queries'
 import type { ConnectionParams, RawDDLHistoryRow } from '@/lib/clickhouse/types'
+import { getDemoHistory } from '@/lib/mock/demo-schema'
 import type { ConnectionMode } from './connection-store'
 
 type HistoryStatus = 'idle' | 'loading' | 'ready' | 'error'
@@ -26,6 +27,11 @@ export const useHistoryStore = create<HistoryState>((set) => ({
   loadHistory: async (params: ConnectionParams, options: LoadHistoryOptions = {}) => {
     set({ status: 'loading', error: null })
     try {
+      if (options.mode === 'demo') {
+        set({ entries: getDemoHistory(), status: 'ready' })
+        return
+      }
+
       const rows =
         options.mode === 'server' ? await fetchServerHistory() : await fetchDDLHistory(params)
       set({ entries: rows, status: 'ready' })

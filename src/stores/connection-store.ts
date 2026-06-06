@@ -8,8 +8,9 @@ import {
   saveStoredConnection,
   toConnectionParams,
 } from '@/lib/connection-storage'
+import { demoConnectionParams } from '@/lib/mock/demo-schema'
 
-export type ConnectionMode = 'direct' | 'server'
+export type ConnectionMode = 'direct' | 'server' | 'demo'
 
 interface ConnectOptions {
   mode?: ConnectionMode
@@ -47,6 +48,18 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
     set({ isConnecting: true, error: null })
 
     try {
+      if (mode === 'demo') {
+        set({
+          ...demoConnectionParams,
+          mode,
+          isConnected: true,
+          isConnecting: false,
+          error: null,
+        })
+        clearStoredConnection()
+        return true
+      }
+
       if (mode === 'server') {
         await connectServerMode(params)
       } else {

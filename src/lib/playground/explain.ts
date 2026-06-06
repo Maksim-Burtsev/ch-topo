@@ -15,7 +15,7 @@ export interface ExplainResult {
 export interface ExplainOptions {
   timeoutMs?: number
   signal?: AbortSignal
-  connectionMode?: 'direct' | 'server'
+  connectionMode?: 'direct' | 'server' | 'demo'
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000
@@ -138,6 +138,14 @@ export async function explainQuery(
   options?: ExplainOptions,
 ): Promise<ExplainResult> {
   const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS
+  if (options?.connectionMode === 'demo') {
+    return {
+      mode,
+      text: '',
+      error: 'Demo Mode cannot run EXPLAIN. Connect to ClickHouse to inspect real query plans.',
+    }
+  }
+
   if (options?.connectionMode === 'server') {
     return explainServerQuery(sql, mode, options)
   }
