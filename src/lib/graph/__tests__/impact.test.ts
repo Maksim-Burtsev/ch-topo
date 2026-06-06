@@ -344,6 +344,33 @@ describe('DROP TABLE', () => {
     expect(dictBreak?.objectName).toBe('analytics.regions')
   })
 
+  it('drop dictionary key column from structured ClickHouse source → dict breaks', () => {
+    const dictionaries: RawDictionaryRow[] = [
+      {
+        database: 'analytics',
+        name: 'users_dict',
+        source: "CLICKHOUSE(DB 'analytics' TABLE 'users_source')",
+        structure: '',
+        bytes_allocated: '0',
+        key_names: ['user_id'],
+        key_types: ['UInt64'],
+        attribute_names: ['country'],
+        attribute_types: ['String'],
+      },
+    ]
+    const graph = buildDependencyGraph([], [], [], dictionaries, [], [])
+
+    const impacts = analyzeImpact(
+      { type: 'DROP_COLUMN', table: 'analytics.users_source', column: 'user_id' },
+      graph,
+    )
+
+    const dictBreak = impacts.find((impact) => impact.objectType === 'dictionary')
+    expect(dictBreak).toBeDefined()
+    expect(dictBreak?.severity).toBe('break')
+    expect(dictBreak?.objectName).toBe('analytics.users_dict')
+  })
+
   it('drop table with distributed/buffer → stale', () => {
     const graph = buildDefault()
     // Manually add distributed and buffer deps pointing to events
