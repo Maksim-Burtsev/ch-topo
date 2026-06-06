@@ -40,6 +40,11 @@ CREATE TABLE chtopo_it.regions_source
 ENGINE = MergeTree
 ORDER BY region_id;
 
+INSERT INTO chtopo_it.regions_source VALUES
+    (1, 'California', 'US'),
+    (2, 'Ontario', 'CA'),
+    (3, 'Bavaria', 'DE');
+
 CREATE DICTIONARY chtopo_it.regions
 (
     region_id UInt32,
@@ -53,6 +58,8 @@ SOURCE(CLICKHOUSE(
 ))
 LAYOUT(FLAT())
 LIFETIME(MIN 0 MAX 0);
+
+SYSTEM RELOAD DICTIONARY chtopo_it.regions;
 
 CREATE TABLE chtopo_it.daily_stats
 (
@@ -110,10 +117,10 @@ ENGINE = MergeTree
 ORDER BY (event_date, user_id);
 
 CREATE TABLE chtopo_it.events_distributed AS chtopo_it.events_local
-ENGINE = Distributed('default', currentDatabase(), 'events_local', rand());
+ENGINE = Distributed('default', 'chtopo_it', 'events_local', rand());
 
 CREATE TABLE chtopo_it.events_buffer AS chtopo_it.events_local
-ENGINE = Buffer(currentDatabase(), 'events_local', 16, 10, 100, 10000, 100000, 10000000, 100000000);
+ENGINE = Buffer('chtopo_it', 'events_local', 16, 10, 100, 10000, 100000, 10000000, 100000000);
 
 CREATE ROLE IF NOT EXISTS integration_reader;
 GRANT SELECT(user_id, event_type) ON chtopo_it.events TO integration_reader;
