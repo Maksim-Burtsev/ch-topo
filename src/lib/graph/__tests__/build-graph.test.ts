@@ -191,6 +191,84 @@ WHERE u.country = 'US'`,
     })
     expect(graph.columnToMVs.has('analytics.events.id')).toBe(false)
   })
+
+  it('keeps fully qualified overlapping MV columns on the referenced source table', () => {
+    const tables: RawTableRow[] = [
+      {
+        database: 'analytics',
+        name: 'orders',
+        engine: 'MergeTree',
+        total_rows: '0',
+        total_bytes: '0',
+        data_compressed_bytes: '0',
+        create_table_query:
+          'CREATE TABLE analytics.orders (id UInt64, user_id UInt64, status String)',
+        sorting_key: '',
+        partition_key: '',
+        metadata_modification_time: '2026-03-15 00:00:00',
+      },
+      {
+        database: 'analytics',
+        name: 'users',
+        engine: 'MergeTree',
+        total_rows: '0',
+        total_bytes: '0',
+        data_compressed_bytes: '0',
+        create_table_query: 'CREATE TABLE analytics.users (id UInt64, status String)',
+        sorting_key: '',
+        partition_key: '',
+        metadata_modification_time: '2026-03-15 00:00:00',
+      },
+      {
+        database: 'analytics',
+        name: 'orders_mv',
+        engine: 'MaterializedView',
+        total_rows: '0',
+        total_bytes: '0',
+        data_compressed_bytes: '0',
+        create_table_query: `CREATE MATERIALIZED VIEW analytics.orders_mv TO analytics.orders_target
+AS SELECT analytics.users.status AS user_status
+FROM analytics.orders
+JOIN analytics.users ON analytics.orders.user_id = analytics.users.id
+WHERE analytics.users.status = 'active'`,
+        sorting_key: '',
+        partition_key: '',
+        metadata_modification_time: '2026-03-15 00:00:00',
+      },
+    ]
+    const columns: RawColumnRow[] = [
+      ...['id', 'user_id', 'status'].map((name) => ({
+        database: 'analytics',
+        table: 'orders',
+        name,
+        type: name === 'status' ? 'String' : 'UInt64',
+        default_kind: '',
+        default_expression: '',
+        compression_codec: '',
+        data_compressed_bytes: '0',
+        data_uncompressed_bytes: '0',
+      })),
+      ...['id', 'status'].map((name) => ({
+        database: 'analytics',
+        table: 'users',
+        name,
+        type: name === 'status' ? 'String' : 'UInt64',
+        default_kind: '',
+        default_expression: '',
+        compression_codec: '',
+        data_compressed_bytes: '0',
+        data_uncompressed_bytes: '0',
+      })),
+    ]
+
+    const graph = buildDependencyGraph(tables, columns, [], [], [], [])
+
+    expect(graph.columnToMVs.get('analytics.users.status')).toContainEqual({
+      mvName: 'analytics.orders_mv',
+      usageContext: 'where',
+    })
+    expect(graph.columnToMVs.get('analytics.orders.status')).toBeUndefined()
+  })
 })
 
 // ─── MergeTree Internal Dependencies ──────────────────────────────────

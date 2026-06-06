@@ -326,6 +326,46 @@ WHERE u.country = 'US'`
     })
   })
 
+  it('resolves fully qualified source columns when joined tables share column names', () => {
+    const ddl = `CREATE MATERIALIZED VIEW analytics.orders_mv TO analytics.orders_target
+AS SELECT
+    analytics.users.status AS user_status,
+    analytics.orders.status AS order_status
+FROM analytics.orders
+JOIN analytics.users ON analytics.orders.user_id = analytics.users.id
+WHERE analytics.users.status = 'active'`
+
+    const cols = new Set(['id', 'user_id', 'status'])
+    const result = parseDDL(
+      ddl,
+      'MaterializedView',
+      cols,
+      new Map([
+        ['analytics.orders', new Set(['id', 'user_id', 'status'])],
+        ['analytics.users', new Set(['id', 'status'])],
+      ]),
+    )
+
+    expect(result.referencedColumns).toContainEqual({
+      column: 'status',
+      context: 'select',
+      sourceTable: 'analytics.users',
+    })
+    expect(result.referencedColumns).toContainEqual({
+      column: 'status',
+      context: 'where',
+      sourceTable: 'analytics.users',
+    })
+    expect(
+      result.referencedColumns.filter(
+        (ref) =>
+          ref.column === 'status' &&
+          ref.context === 'where' &&
+          ref.sourceTable === 'analytics.orders',
+      ),
+    ).toEqual([])
+  })
+
   it('parses practical CTE and subquery sources without treating aliases as tables', () => {
     const ddl = `CREATE MATERIALIZED VIEW analytics.cte_mv TO analytics.cte_target
 AS WITH filtered AS (
