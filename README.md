@@ -80,11 +80,17 @@ The UI is designed for desktop/admin workflows. Use a viewport of at least
 ## Features
 
 - **Schema Graph** — visualize tables, materialized views, dictionaries and their dependencies with dagre auto-layout
-- **Impact Analysis** — simulate `DROP COLUMN`, `MODIFY COLUMN`, `RENAME COLUMN`, `DROP TABLE` and see what breaks before you run it
+- **Impact Analysis** — simulate `DROP COLUMN`, `MODIFY COLUMN`, `RENAME COLUMN`, `DROP TABLE` and see known dependency risks before you run it
 - **Table Explorer** — browse tables with sorting, filtering by engine, and column-level detail
 - **DDL History** — timeline view of DDL operations from `system.query_log`
 - **Light/Dark mode** — toggle between themes, persisted to localStorage
 - **Keyboard shortcuts** — `1-5` page nav, `/` focus search, `Esc` dismiss
+
+## Impact Analysis Scope
+
+Impact analysis is static schema analysis, not a ClickHouse execution guarantee.
+Supported DDL actions, unsupported SQL constructs, and known false-negative
+classes are documented in [docs/impact-analysis-scope.md](docs/impact-analysis-scope.md).
 
 ## Stack
 

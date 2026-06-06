@@ -150,7 +150,15 @@ export function ImpactPage() {
   return (
     <div className="max-w-3xl">
       <p className="mb-6 text-sm text-muted-foreground">
-        Simulate a DDL change and see what breaks before you run it.
+        Simulate a DDL change and see known dependency risks before you run it.{' '}
+        <a
+          href="https://github.com/Maksim-Burtsev/ch-topo/blob/master/docs/impact-analysis-scope.md"
+          target="_blank"
+          rel="noreferrer"
+          className="text-foreground underline decoration-muted-foreground/40 underline-offset-4 hover:decoration-foreground"
+        >
+          Supported scope
+        </a>
       </p>
 
       {/* Mode toggle */}
