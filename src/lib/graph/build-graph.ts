@@ -93,7 +93,36 @@ function parseBufferEngine(ddl: string): string | null {
   return fqn(db, table)
 }
 
-function parseDictSource(source: string, structure: string): DictDependency | null {
+function getDictionarySourceValue(source: string, key: 'db' | 'database' | 'table'): string | null {
+  const keyPattern = key === 'database' ? '(?:database)' : key
+  const quoted = new RegExp(`\\b${keyPattern}\\b\\s*(?:=\\s*)?['"\`]([^'"\`\\s)]+)['"\`]`, 'i')
+  const bare = new RegExp(`\\b${keyPattern}\\b\\s*=\\s*([^\\s)]+)`, 'i')
+
+  return quoted.exec(source)?.[1] ?? bare.exec(source)?.[1] ?? null
+}
+
+function getDictionaryKeyColumns(dict: RawDictionaryRow): string[] {
+  if (dict.key_names.length > 0) {
+    return Array.from(new Set(dict.key_names.filter(Boolean)))
+  }
+
+  const keyColumns: string[] = []
+  const keySection = /\bkey:\s*(.+?)(?:\battributes:|$)/i.exec(dict.structure)
+  if (keySection?.[1]) {
+    const keyParts = keySection[1].split(',')
+    for (const part of keyParts) {
+      const colName = part.trim().split(/\s+/)[0]
+      if (colName && !keyColumns.includes(colName)) {
+        keyColumns.push(colName)
+      }
+    }
+  }
+
+  return keyColumns
+}
+
+function parseDictSource(dict: RawDictionaryRow): DictDependency | null {
+  const source = dict.source
   let sourceTable: string | null = null
 
   // Simple "db.table" format
@@ -104,31 +133,19 @@ function parseDictSource(source: string, structure: string): DictDependency | nu
 
   // ClickHouse(...) format: look for db and table keys
   if (!sourceTable) {
-    const dbMatch = /\bdb\s*=\s*'?(\w+)'?/i.exec(source)
-    const tableMatch = /\btable\s*=\s*'?(\w+)'?/i.exec(source)
-    if (dbMatch?.[1] && tableMatch?.[1]) {
-      sourceTable = fqn(dbMatch[1], tableMatch[1])
-    } else if (tableMatch?.[1]) {
-      sourceTable = tableMatch[1]
+    const db =
+      getDictionarySourceValue(source, 'db') ?? getDictionarySourceValue(source, 'database')
+    const table = getDictionarySourceValue(source, 'table')
+    if (db && table) {
+      sourceTable = fqn(db, table)
+    } else if (table) {
+      sourceTable = table
     }
   }
 
   if (!sourceTable) return null
 
-  // Extract key columns from structure: "key: col1 Type1, col2 Type2, attributes: ..."
-  const keyColumns: string[] = []
-  const keySection = /\bkey:\s*(.+?)(?:\battributes:|$)/i.exec(structure)
-  if (keySection?.[1]) {
-    const keyParts = keySection[1].split(',')
-    for (const part of keyParts) {
-      const colName = part.trim().split(/\s+/)[0]
-      if (colName) {
-        keyColumns.push(colName)
-      }
-    }
-  }
-
-  return { sourceTable, keyColumns }
+  return { sourceTable, keyColumns: getDictionaryKeyColumns(dict) }
 }
 
 export function buildDependencyGraph(
@@ -284,7 +301,7 @@ export function buildDependencyGraph(
   // Step 5: Dictionary sources
   for (const dict of dictionaries) {
     const dictKey = fqn(dict.database, dict.name)
-    const dep = parseDictSource(dict.source, dict.structure)
+    const dep = parseDictSource(dict)
     if (dep) {
       graph.dictSources.set(dictKey, dep)
     }

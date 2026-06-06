@@ -580,6 +580,30 @@ describe('dictionary sources', () => {
     expect(dep?.sourceTable).toBe('analytics.regions_source')
     expect(dep?.keyColumns).toEqual(['region_id'])
   })
+
+  it('extracts ClickHouse dictionary source variants and structured keys', () => {
+    const dictionaries: RawDictionaryRow[] = [
+      {
+        database: 'analytics',
+        name: 'users_dict',
+        source:
+          "CLICKHOUSE(HOST 'clickhouse' PORT 9000 USER 'default' DB 'analytics' TABLE 'users_source')",
+        structure: '',
+        bytes_allocated: '0',
+        key_names: ['user_id'],
+        key_types: ['UInt64'],
+        attribute_names: ['country'],
+        attribute_types: ['String'],
+      },
+    ]
+
+    const graph = buildDependencyGraph([], [], [], dictionaries, [], [])
+
+    expect(graph.dictSources.get('analytics.users_dict')).toEqual({
+      sourceTable: 'analytics.users_source',
+      keyColumns: ['user_id'],
+    })
+  })
 })
 
 // ─── Index Columns ────────────────────────────────────────────────────
