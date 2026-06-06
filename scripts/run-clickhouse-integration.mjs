@@ -16,6 +16,15 @@ function run(command, args, options = {}) {
   }
 }
 
+function tryRun(command, args, options = {}) {
+  const result = spawnSync(command, args, {
+    stdio: 'inherit',
+    env: { ...process.env, CHTOPO_CLICKHOUSE_HTTP_PORT: httpPort },
+    ...options,
+  })
+  return result.status === 0
+}
+
 async function waitForClickHouse() {
   const deadline = Date.now() + 60_000
   while (Date.now() < deadline) {
@@ -49,6 +58,27 @@ async function seedClickHouse() {
   }
 }
 
+function dumpClickHouseDiagnostics() {
+  const queries = [
+    "SELECT database, name, status, source, origin, `key.names` FROM system.dictionaries FORMAT Vertical",
+    'SHOW CREATE DICTIONARY chtopo_it.regions',
+  ]
+
+  for (const query of queries) {
+    tryRun('docker', [
+      ...composeArgs,
+      'exec',
+      '-T',
+      'clickhouse',
+      'clickhouse-client',
+      '--query',
+      query,
+    ])
+  }
+}
+
+let runError = null
+
 try {
   run('docker', [...composeArgs, 'down', '-v', '--remove-orphans'])
   run('docker', [...composeArgs, 'up', '-d'])
@@ -61,6 +91,13 @@ try {
       VITE_CHTOPO_CLICKHOUSE_HTTP_PORT: httpPort,
     },
   })
+} catch (error) {
+  runError = error
+  dumpClickHouseDiagnostics()
+  throw error
 } finally {
-  run('docker', [...composeArgs, 'down', '-v', '--remove-orphans'])
+  const stopped = tryRun('docker', [...composeArgs, 'down', '-v', '--remove-orphans'])
+  if (!stopped && !runError) {
+    throw new Error('docker compose cleanup failed')
+  }
 }
