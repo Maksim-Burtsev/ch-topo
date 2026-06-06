@@ -604,6 +604,29 @@ describe('dictionary sources', () => {
       keyColumns: ['user_id'],
     })
   })
+
+  it('extracts loaded ClickHouse dictionary source from system metadata', () => {
+    const dictionaries: RawDictionaryRow[] = [
+      {
+        database: 'analytics',
+        name: 'regions',
+        source: 'ClickHouse: analytics.regions_source',
+        structure: '',
+        bytes_allocated: '0',
+        key_names: ['region_id'],
+        key_types: ['UInt32'],
+        attribute_names: ['region_name'],
+        attribute_types: ['String'],
+      },
+    ]
+
+    const graph = buildDependencyGraph([], [], [], dictionaries, [], [])
+
+    expect(graph.dictSources.get('analytics.regions')).toEqual({
+      sourceTable: 'analytics.regions_source',
+      keyColumns: ['region_id'],
+    })
+  })
 })
 
 // ─── Index Columns ────────────────────────────────────────────────────

@@ -224,8 +224,8 @@ function parseDictSource(dict: RawDictionaryRow): DictDependency | null {
   const source = dict.source
   let sourceTable: string | null = null
 
-  // Simple "db.table" format
-  const simpleMatch = /^(\w+)\.(\w+)$/.exec(source.trim())
+  // Simple "db.table" or system.dictionaries format like "ClickHouse: db.table".
+  const simpleMatch = /(?:^|:\s*)([A-Za-z_][\w$]*)\.([A-Za-z_][\w$]*)(?:\s|$)/.exec(source.trim())
   if (simpleMatch) {
     sourceTable = `${simpleMatch[1]}.${simpleMatch[2]}`
   }
