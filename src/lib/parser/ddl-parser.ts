@@ -39,6 +39,7 @@ export function parseDDL(
   createTableQuery: string,
   engine: string,
   knownColumns: Set<string> = new Set(),
+  knownColumnsByTable: Map<string, Set<string>> = new Map(),
 ): ParsedTable {
   const base = emptyParsedTable()
   const { database, name } = extractTableName(createTableQuery)
@@ -47,7 +48,7 @@ export function parseDDL(
   base.engine = engine
 
   if (isMaterializedView(engine)) {
-    const mvResult = parseMaterializedView(createTableQuery, knownColumns)
+    const mvResult = parseMaterializedView(createTableQuery, knownColumns, knownColumnsByTable)
     return { ...base, ...mvResult, database, name, engine }
   }
 

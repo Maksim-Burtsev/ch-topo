@@ -1,5 +1,6 @@
 export interface ColumnReference {
   column: string
+  sourceTable?: string
   context: 'select' | 'where' | 'group_by' | 'join' | 'order_by'
 }
 
@@ -17,6 +18,7 @@ export interface ParsedTable {
 
   // MV fields
   sourceTable: string | null
+  sourceTables: string[]
   targetTable: string | null
   referencedColumns: ColumnReference[]
 
@@ -35,6 +37,7 @@ export function emptyParsedTable(): ParsedTable {
     sampleByColumn: null,
     settings: {},
     sourceTable: null,
+    sourceTables: [],
     targetTable: null,
     referencedColumns: [],
     selectsAll: false,

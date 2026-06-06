@@ -24,6 +24,53 @@ function addColumnToMVRef(map: Map<string, MVReference[]>, colKey: string, ref: 
   }
 }
 
+function getMVSourceTables(parsed: {
+  sourceTable: string | null
+  sourceTables: string[]
+}): string[] {
+  if (parsed.sourceTables.length > 0) return parsed.sourceTables
+  return parsed.sourceTable ? [parsed.sourceTable] : []
+}
+
+function getMVKnownColumns(
+  sourceTables: string[],
+  columnsByTable: Map<string, Set<string>>,
+): Set<string> {
+  const knownColumns = new Set<string>()
+  for (const sourceTable of sourceTables) {
+    const sourceColumns = columnsByTable.get(sourceTable)
+    if (!sourceColumns) continue
+
+    for (const column of sourceColumns) {
+      knownColumns.add(column)
+    }
+  }
+  return knownColumns
+}
+
+function getMVColumnsByTable(
+  sourceTables: string[],
+  columnsByTable: Map<string, Set<string>>,
+): Map<string, Set<string>> {
+  const mvColumnsByTable = new Map<string, Set<string>>()
+  for (const sourceTable of sourceTables) {
+    mvColumnsByTable.set(sourceTable, columnsByTable.get(sourceTable) ?? new Set<string>())
+  }
+  return mvColumnsByTable
+}
+
+function getReferenceSourceTables(
+  column: string,
+  explicitSourceTable: string | undefined,
+  sourceTables: string[],
+  columnsByTable: Map<string, Set<string>>,
+): string[] {
+  if (explicitSourceTable) return [explicitSourceTable]
+  if (sourceTables.length === 1) return [sourceTables[0] ?? '']
+
+  return sourceTables.filter((sourceTable) => columnsByTable.get(sourceTable)?.has(column))
+}
+
 function parseDistributedEngine(ddl: string): string | null {
   // ENGINE = Distributed(cluster, db, table[, sharding_key])
   const match = /\bDistributed\s*\(\s*'?(\w+)'?\s*,\s*'?(\w+)'?\s*,\s*'?(\w+)'?/i.exec(ddl)
@@ -113,37 +160,52 @@ export function buildDependencyGraph(
     const tableKey = fqn(table.database, table.name)
 
     if (/materializedview/i.test(table.engine)) {
-      // For MVs: first extract source table, then re-parse with source columns
+      // For MVs: first extract source tables, then re-parse with source columns.
       const preliminary = parseDDL(table.create_table_query, table.engine)
-      const sourceKey = preliminary.sourceTable
-      const sourceCols = sourceKey
-        ? (columnsByTable.get(sourceKey) ?? new Set<string>())
-        : new Set<string>()
-      const parsed = parseDDL(table.create_table_query, table.engine, sourceCols)
+      const preliminarySources = getMVSourceTables(preliminary)
+      const sourceCols = getMVKnownColumns(preliminarySources, columnsByTable)
+      const sourceColumnsByTable = getMVColumnsByTable(preliminarySources, columnsByTable)
+      const parsed = parseDDL(
+        table.create_table_query,
+        table.engine,
+        sourceCols,
+        sourceColumnsByTable,
+      )
+      const sourceTables = getMVSourceTables(parsed)
 
-      if (parsed.sourceTable) {
-        graph.mvSources.set(tableKey, [parsed.sourceTable])
+      if (sourceTables.length > 0) {
+        graph.mvSources.set(tableKey, sourceTables)
       }
       graph.mvTargets.set(tableKey, parsed.targetTable)
 
       // columnToMVs
-      if (parsed.selectsAll && parsed.sourceTable) {
-        // SELECT * — all source columns are referenced
-        const allCols = columnsByTable.get(parsed.sourceTable)
-        if (allCols) {
-          for (const col of allCols) {
-            addColumnToMVRef(graph.columnToMVs, `${parsed.sourceTable}.${col}`, {
-              mvName: tableKey,
-              usageContext: 'select',
-            })
+      if (parsed.selectsAll && sourceTables.length > 0) {
+        // SELECT * — all source columns are referenced.
+        for (const sourceTable of sourceTables) {
+          const allCols = columnsByTable.get(sourceTable)
+          if (allCols) {
+            for (const col of allCols) {
+              addColumnToMVRef(graph.columnToMVs, `${sourceTable}.${col}`, {
+                mvName: tableKey,
+                usageContext: 'select',
+              })
+            }
           }
         }
-      } else if (parsed.sourceTable) {
+      } else if (sourceTables.length > 0) {
         for (const ref of parsed.referencedColumns) {
-          addColumnToMVRef(graph.columnToMVs, `${parsed.sourceTable}.${ref.column}`, {
-            mvName: tableKey,
-            usageContext: ref.context,
-          })
+          const refSourceTables = getReferenceSourceTables(
+            ref.column,
+            ref.sourceTable,
+            sourceTables,
+            columnsByTable,
+          )
+          for (const sourceTable of refSourceTables) {
+            addColumnToMVRef(graph.columnToMVs, `${sourceTable}.${ref.column}`, {
+              mvName: tableKey,
+              usageContext: ref.context,
+            })
+          }
         }
       }
     } else {

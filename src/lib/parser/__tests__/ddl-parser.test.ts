@@ -300,6 +300,63 @@ GROUP BY event_date, session_id, user_id`
     expect(whereCols).toContain('is_bounce')
   })
 
+  it('parses all MV JOIN sources and resolves qualified aliases', () => {
+    const ddl = `CREATE MATERIALIZED VIEW analytics.joined_mv TO analytics.joined_target
+AS SELECT
+    e.event_date,
+    u.country
+FROM analytics.events AS e
+INNER JOIN analytics.users AS u ON e.user_id = u.id
+WHERE u.country = 'US'`
+
+    const cols = new Set(['event_date', 'country', 'user_id', 'id'])
+    const result = parseDDL(ddl, 'MaterializedView', cols)
+
+    expect(result.sourceTable).toBe('analytics.events')
+    expect(result.sourceTables).toEqual(['analytics.events', 'analytics.users'])
+    expect(result.referencedColumns).toContainEqual({
+      column: 'country',
+      context: 'select',
+      sourceTable: 'analytics.users',
+    })
+    expect(result.referencedColumns).toContainEqual({
+      column: 'id',
+      context: 'join',
+      sourceTable: 'analytics.users',
+    })
+  })
+
+  it('parses practical CTE and subquery sources without treating aliases as tables', () => {
+    const ddl = `CREATE MATERIALIZED VIEW analytics.cte_mv TO analytics.cte_target
+AS WITH filtered AS (
+    SELECT user_id, event_date
+    FROM analytics.events
+    WHERE event_type = 'signup'
+)
+SELECT f.user_id, u.country
+FROM filtered AS f
+JOIN (
+    SELECT id, country
+    FROM analytics.users
+) AS u ON f.user_id = u.id`
+
+    const cols = new Set(['user_id', 'event_date', 'event_type', 'id', 'country'])
+    const result = parseDDL(ddl, 'MaterializedView', cols)
+
+    expect(result.sourceTables).toEqual(['analytics.events', 'analytics.users'])
+    expect(result.sourceTables).not.toContain('filtered')
+    expect(result.referencedColumns).toContainEqual({
+      column: 'user_id',
+      context: 'join',
+      sourceTable: 'analytics.events',
+    })
+    expect(result.referencedColumns).toContainEqual({
+      column: 'id',
+      context: 'join',
+      sourceTable: 'analytics.users',
+    })
+  })
+
   it('detects SELECT *', () => {
     const ddl = `CREATE MATERIALIZED VIEW analytics.all_mv TO analytics.all_target
 AS SELECT * FROM analytics.events`
