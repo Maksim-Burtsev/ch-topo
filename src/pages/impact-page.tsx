@@ -5,6 +5,7 @@ import { SeverityCard } from '@/components/shared/severity-card'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
 import { analyzeImpact } from '@/lib/graph/impact'
+import { buildImpactMarkdown, IMPACT_SCOPE_NOTE, NO_KNOWN_IMPACTS_TITLE } from '@/lib/impact-report'
 import { parseAction } from '@/lib/parser/action-parser'
 import { useGraphStore } from '@/stores/graph-store'
 import { useSchemaStore } from '@/stores/schema-store'
@@ -12,28 +13,6 @@ import type { DDLAction, Impact } from '@/types'
 
 type InputMode = 'sql' | 'builder'
 type ActionType = 'drop_column' | 'modify_column' | 'rename_column' | 'drop_table'
-
-function impactsToMarkdown(results: Impact[], sql: string): string {
-  const lines: string[] = ['## Impact Analysis', '', `\`\`\`sql\n${sql}\n\`\`\``, '']
-  if (results.length === 0) {
-    lines.push('**Safe to execute** — no impacts detected.')
-    return lines.join('\n')
-  }
-  const groups = [
-    { label: 'Breaking', items: results.filter((r) => r.severity === 'break') },
-    { label: 'Stale', items: results.filter((r) => r.severity === 'stale') },
-    { label: 'Warning', items: results.filter((r) => r.severity === 'warning') },
-  ]
-  for (const g of groups) {
-    if (g.items.length === 0) continue
-    lines.push(`### ${g.label} (${g.items.length})`, '')
-    for (const i of g.items) {
-      lines.push(`- **${i.objectName}** (${i.objectType}): ${i.reason}`)
-    }
-    lines.push('')
-  }
-  return lines.join('\n')
-}
 
 export function ImpactPage() {
   const tables = useSchemaStore((s) => s.tables)
@@ -144,7 +123,7 @@ export function ImpactPage() {
 
   const handleCopyMarkdown = useCallback(() => {
     if (!results) return
-    const md = impactsToMarkdown(results, sqlInput)
+    const md = buildImpactMarkdown(results, sqlInput)
     void navigator.clipboard.writeText(md).then(() => {
       setCopied(true)
       setTimeout(() => {
@@ -331,12 +310,8 @@ export function ImpactPage() {
         <div className="flex items-center gap-3 rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-6">
           <CheckCircle size={20} className="text-emerald-400 shrink-0" />
           <div>
-            <p className="text-sm font-medium text-emerald-400">
-              No dependencies affected. Safe to execute.
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              No impacts detected for this action.
-            </p>
+            <p className="text-sm font-medium text-emerald-400">{NO_KNOWN_IMPACTS_TITLE}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{IMPACT_SCOPE_NOTE}</p>
           </div>
         </div>
       )}
