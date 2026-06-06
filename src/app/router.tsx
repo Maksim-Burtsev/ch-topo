@@ -8,7 +8,6 @@ import {
   ImpactPage,
   NotFoundPage,
   PlaygroundPage,
-  SnapshotsPage,
   TableDetailPage,
   TablesPage,
 } from './lazy-pages'
@@ -42,7 +41,6 @@ export const router = createHashRouter([
       { path: '/', element: routeElement(GraphPage) },
       { path: '/tables', element: routeElement(TablesPage) },
       { path: '/tables/:database/:name', element: routeElement(TableDetailPage) },
-      { path: '/snapshots', element: routeElement(SnapshotsPage) },
       { path: '/impact', element: routeElement(ImpactPage) },
       { path: '/playground', element: routeElement(PlaygroundPage) },
       { path: '/history', element: routeElement(HistoryPage) },

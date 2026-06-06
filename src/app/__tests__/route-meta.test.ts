@@ -7,10 +7,10 @@ describe('route metadata', () => {
     ['/connect', 'Connect', 'chtopo — Connect'],
     ['/tables', 'Tables', 'chtopo — Tables'],
     ['/tables/analytics/events', 'Table Detail', 'chtopo — Table Detail'],
-    ['/snapshots', 'Schema Snapshots', 'chtopo — Schema Snapshots'],
     ['/impact', 'Impact Analysis', 'chtopo — Impact Analysis'],
     ['/playground', 'Playground', 'Playground — chtopo'],
     ['/history', 'DDL History', 'chtopo — DDL History'],
+    ['/snapshots', 'Not Found', 'chtopo — Not Found'],
     ['/missing', 'Not Found', 'chtopo — Not Found'],
   ])('resolves metadata for %s', (pathname, routeTitle, documentTitle) => {
     expect(getRouteTitle(pathname)).toBe(routeTitle)
