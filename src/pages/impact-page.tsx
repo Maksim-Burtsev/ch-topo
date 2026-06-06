@@ -1,11 +1,16 @@
-import { CheckCircle, ClipboardCopy, Zap } from 'lucide-react'
+import { CheckCircle, ClipboardCopy, Download, Zap } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { SeverityCard } from '@/components/shared/severity-card'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
 import { analyzeImpact } from '@/lib/graph/impact'
-import { buildImpactMarkdown, IMPACT_SCOPE_NOTE, NO_KNOWN_IMPACTS_TITLE } from '@/lib/impact-report'
+import {
+  buildImpactJson,
+  buildImpactMarkdown,
+  IMPACT_SCOPE_NOTE,
+  NO_KNOWN_IMPACTS_TITLE,
+} from '@/lib/impact-report'
 import { parseAction } from '@/lib/parser/action-parser'
 import { useGraphStore } from '@/stores/graph-store'
 import { useSchemaStore } from '@/stores/schema-store'
@@ -13,6 +18,16 @@ import type { DDLAction, Impact } from '@/types'
 
 type InputMode = 'sql' | 'builder'
 type ActionType = 'drop_column' | 'modify_column' | 'rename_column' | 'drop_table'
+
+function downloadTextFile(filename: string, content: string, type: string) {
+  const blob = new Blob([content], { type })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+}
 
 export function ImpactPage() {
   const tables = useSchemaStore((s) => s.tables)
@@ -130,6 +145,24 @@ export function ImpactPage() {
         setCopied(false)
       }, 2000)
     })
+  }, [results, sqlInput])
+
+  const handleExportMarkdown = useCallback(() => {
+    if (!results) return
+    downloadTextFile(
+      'chtopo-impact-report.md',
+      buildImpactMarkdown(results, sqlInput),
+      'text/markdown;charset=utf-8',
+    )
+  }, [results, sqlInput])
+
+  const handleExportJson = useCallback(() => {
+    if (!results) return
+    downloadTextFile(
+      'chtopo-impact-report.json',
+      buildImpactJson(results, sqlInput),
+      'application/json;charset=utf-8',
+    )
   }, [results, sqlInput])
 
   const needsColumn = actionType !== 'drop_table'
@@ -315,11 +348,23 @@ export function ImpactPage() {
 
       {/* Results */}
       {results !== null && results.length === 0 && (
-        <div className="flex items-center gap-3 rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-6">
-          <CheckCircle size={20} className="text-emerald-400 shrink-0" />
-          <div>
-            <p className="text-sm font-medium text-emerald-400">{NO_KNOWN_IMPACTS_TITLE}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{IMPACT_SCOPE_NOTE}</p>
+        <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-6">
+          <div className="flex items-start gap-3">
+            <CheckCircle size={20} className="text-emerald-400 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-emerald-400">{NO_KNOWN_IMPACTS_TITLE}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{IMPACT_SCOPE_NOTE}</p>
+            </div>
+          </div>
+          <div className="mt-4 flex gap-2">
+            <Button variant="ghost" size="sm" onClick={handleExportMarkdown} className="gap-1.5">
+              <Download size={14} />
+              Export Markdown
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleExportJson} className="gap-1.5">
+              <Download size={14} />
+              Export JSON
+            </Button>
           </div>
         </div>
       )}
@@ -346,10 +391,18 @@ export function ImpactPage() {
               </span>
               <span className="text-xs text-muted-foreground">Warning</span>
             </div>
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-1">
               <Button variant="ghost" size="sm" onClick={handleCopyMarkdown} className="gap-1.5">
                 <ClipboardCopy size={14} />
                 {copied ? 'Copied!' : 'Copy as Markdown'}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleExportMarkdown} className="gap-1.5">
+                <Download size={14} />
+                Export Markdown
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleExportJson} className="gap-1.5">
+                <Download size={14} />
+                Export JSON
               </Button>
             </div>
           </div>
