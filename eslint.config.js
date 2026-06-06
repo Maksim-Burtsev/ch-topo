@@ -63,6 +63,7 @@ export default defineConfig([
   globalIgnores(['dist', 'dist-api']),
   {
     files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/cli/**/*.ts'],
     extends: [
       js.configs.recommended,
       tseslint.configs.strictTypeChecked,
@@ -89,6 +90,24 @@ export default defineConfig([
     },
   },
   {
+    files: ['src/cli/**/*.ts'],
+    extends: [js.configs.recommended, tseslint.configs.strictTypeChecked, prettier],
+    plugins: {
+      'import-x': importPlugin,
+    },
+    languageOptions: {
+      ecmaVersion: 2023,
+      globals: globals.node,
+      parserOptions: {
+        project: './tsconfig.cli.json',
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      ...baseRules,
+    },
+  },
+  {
     files: ['api/**/*.ts'],
     extends: [js.configs.recommended, tseslint.configs.strictTypeChecked, prettier],
     plugins: {
@@ -99,6 +118,24 @@ export default defineConfig([
       globals: globals.node,
       parserOptions: {
         project: './api/tsconfig.json',
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      ...baseRules,
+    },
+  },
+  {
+    files: ['vite.config.ts', 'vite.cli.config.ts'],
+    extends: [js.configs.recommended, tseslint.configs.strictTypeChecked, prettier],
+    plugins: {
+      'import-x': importPlugin,
+    },
+    languageOptions: {
+      ecmaVersion: 2023,
+      globals: globals.node,
+      parserOptions: {
+        project: './tsconfig.node.json',
         tsconfigRootDir: import.meta.dirname,
       },
     },
