@@ -1,10 +1,11 @@
-import { Check, Copy, ExternalLink, Table2 } from 'lucide-react'
+import { Check, Copy, ExternalLink, Network, Table2 } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import type { RawTableRow } from '@/lib/clickhouse/types'
 import { copyToClipboard } from '@/lib/playground/results-format'
 import { extractQueryTableRefs } from '@/lib/playground/sql-references'
 import { formatBytes, formatNumber } from '@/lib/utils'
+import { useGraphSelectionStore } from '@/stores/graph-selection-store'
 
 interface QueryContextStripProps {
   sql: string
@@ -30,6 +31,7 @@ function tablePath(database: string, table: string): string {
 
 export function QueryContextStrip({ sql, currentDatabase, tables }: QueryContextStripProps) {
   const navigate = useNavigate()
+  const selectAndFocus = useGraphSelectionStore((s) => s.selectAndFocus)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
 
   const refs = useMemo<ResolvedRef[]>(() => {
@@ -95,6 +97,17 @@ export function QueryContextStrip({ sql, currentDatabase, tables }: QueryContext
                   title={`Open ${ref.displayName}`}
                 >
                   <ExternalLink className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    selectAndFocus(ref.key)
+                    void navigate('/')
+                  }}
+                  className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                  title={`Show ${ref.displayName} in graph`}
+                >
+                  <Network className="h-3 w-3" />
                 </button>
               </>
             ) : (
