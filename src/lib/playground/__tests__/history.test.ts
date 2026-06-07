@@ -6,6 +6,10 @@ import {
   filterHistory,
   formatTimestamp,
   getHistory,
+  getSavedQueries,
+  removeSavedQuery,
+  renameSavedQuery,
+  saveQuery,
   truncateSql,
 } from '@/lib/playground/history'
 
@@ -102,7 +106,7 @@ describe('getHistory', () => {
 })
 
 describe('clearHistory', () => {
-  it('removes all history', () => {
+  it('removes recent history', () => {
     addToHistory({
       sql: 'SELECT 1',
       timestamp: Date.now(),
@@ -115,6 +119,22 @@ describe('clearHistory', () => {
 
     clearHistory()
     expect(getHistory()).toEqual([])
+  })
+
+  it('preserves saved queries', () => {
+    saveQuery('SELECT saved', 'Saved query')
+    addToHistory({
+      sql: 'SELECT recent',
+      timestamp: Date.now(),
+      elapsed: 0.05,
+      rowsReturned: 1,
+      error: false,
+    })
+
+    clearHistory()
+
+    expect(getHistory()).toHaveLength(1)
+    expect(getSavedQueries()[0]?.title).toBe('Saved query')
   })
 })
 
@@ -213,5 +233,58 @@ describe('filterHistory', () => {
 
   it('returns empty for no match', () => {
     expect(filterHistory(entries, 'nonexistent')).toEqual([])
+  })
+
+  it('filters by saved query title', () => {
+    const firstEntry = entries[0]
+    if (!firstEntry) throw new Error('missing test entry')
+    const results = filterHistory([{ ...firstEntry, saved: true, title: 'Revenue check' }], 'rev')
+
+    expect(results).toHaveLength(1)
+  })
+})
+
+describe('saved queries', () => {
+  it('saves a query with a generated title', () => {
+    const saved = saveQuery('SELECT *\nFROM events')
+
+    expect(saved.saved).toBe(true)
+    expect(saved.title).toBe('SELECT *')
+    expect(getSavedQueries()).toHaveLength(1)
+  })
+
+  it('marks a recent query as saved instead of duplicating it', () => {
+    addToHistory({
+      sql: 'SELECT * FROM events',
+      timestamp: 1000,
+      elapsed: 0.1,
+      rowsReturned: 10,
+      error: false,
+    })
+
+    saveQuery('SELECT * FROM events', 'Events')
+
+    expect(getHistory()).toHaveLength(1)
+    expect(getSavedQueries()[0]).toMatchObject({
+      sql: 'SELECT * FROM events',
+      title: 'Events',
+      saved: true,
+    })
+  })
+
+  it('renames a saved query', () => {
+    const saved = saveQuery('SELECT 1', 'Old')
+    const renamed = renameSavedQuery(saved.id, 'New')
+
+    expect(renamed?.title).toBe('New')
+    expect(getSavedQueries()[0]?.title).toBe('New')
+  })
+
+  it('removes a saved query', () => {
+    const saved = saveQuery('SELECT 1', 'Saved')
+
+    removeSavedQuery(saved.id)
+
+    expect(getSavedQueries()).toEqual([])
   })
 })
