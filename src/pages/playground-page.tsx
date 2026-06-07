@@ -13,6 +13,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { ExplainView } from '@/components/playground/explain-view'
+import { QueryContextStrip } from '@/components/playground/query-context-strip'
 import { QueryHistory } from '@/components/playground/query-history'
 import { QueryStats, type QueryState } from '@/components/playground/query-stats'
 import { ResultsJson } from '@/components/playground/results-json'
@@ -135,6 +136,7 @@ export function PlaygroundPage() {
   const [cappedMessage, setCappedMessage] = useState<string | null>(null)
   const [explainResult, setExplainResult] = useState<ExplainResult | null>(null)
   const [explainMode, setExplainMode] = useState<ExplainMode>('plan')
+  const [lastContextSql, setLastContextSql] = useState('')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [pendingMutatingQuery, setPendingMutatingQuery] = useState<PendingMutatingQuery | null>(
     null,
@@ -148,6 +150,14 @@ export function PlaygroundPage() {
     () => buildStarterQueries(tables, columns, currentDatabase),
     [tables, columns, currentDatabase],
   )
+
+  const editorContextSql = useMemo(() => {
+    const trimmed = sql.trim()
+    if (!trimmed) return ''
+
+    const idx = trimmed.indexOf(';')
+    return (idx >= 0 ? trimmed.slice(0, idx) : trimmed).trim()
+  }, [sql])
 
   // ── Get active statement ─────────────────────────────────────
 
@@ -174,6 +184,7 @@ export function PlaygroundPage() {
     (intent?: ExecuteIntent) => {
       const stmt = (intent?.sql ?? getActiveStatement()).trim()
       if (!stmt) return
+      setLastContextSql(stmt)
 
       const safety = validateQuerySafety(stmt, {
         readOnlyMode,
@@ -257,6 +268,7 @@ export function PlaygroundPage() {
   const handleStarterQueryRun = useCallback(
     (query: StarterQuery) => {
       setSql(query.sql)
+      setLastContextSql(query.sql)
       if (!isDemoMode) {
         handleExecute({ sql: query.sql })
       }
@@ -270,6 +282,7 @@ export function PlaygroundPage() {
     (mode: ExplainMode) => {
       const stmt = getActiveStatement()
       if (!stmt) return
+      setLastContextSql(stmt)
 
       abortRef.current?.abort()
       const controller = new AbortController()
@@ -347,6 +360,7 @@ export function PlaygroundPage() {
     setResult(null)
     setCappedMessage(null)
     setExplainResult(null)
+    setLastContextSql('')
     setPendingMutatingQuery(null)
     setQueryState({ status: 'idle' })
   }, [])
@@ -356,6 +370,7 @@ export function PlaygroundPage() {
     setResult(null)
     setCappedMessage(null)
     setExplainResult(null)
+    setLastContextSql('')
     setPendingMutatingQuery(null)
     setQueryState({ status: 'idle' })
 
@@ -369,6 +384,7 @@ export function PlaygroundPage() {
   const handleHistorySelect = useCallback(
     (selectedSql: string) => {
       setSql(selectedSql)
+      setLastContextSql(selectedSql)
     },
     [setSql],
   )
@@ -453,6 +469,7 @@ export function PlaygroundPage() {
   const hasResults = result !== null || explainResult !== null
   const isRunning = queryState.status === 'running'
   const sessionExpired = result?.sessionExpired === true || explainResult?.sessionExpired === true
+  const contextSql = lastContextSql || editorContextSql
 
   return (
     <div ref={containerRef} className="flex h-full flex-col overflow-hidden -m-6">
@@ -682,6 +699,8 @@ export function PlaygroundPage() {
               </button>
             </div>
           )}
+
+          <QueryContextStrip sql={contextSql} currentDatabase={currentDatabase} tables={tables} />
 
           {/* Results content */}
           <div className="flex-1 overflow-auto">
