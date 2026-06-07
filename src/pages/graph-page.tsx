@@ -29,6 +29,7 @@ import type { DependencyGraph } from '@/lib/graph/types'
 import { formatBytes, formatNumber } from '@/lib/utils'
 import { useConnectionStore } from '@/stores/connection-store'
 import { useDatabaseFilterStore } from '@/stores/database-filter-store'
+import { useGraphSelectionStore } from '@/stores/graph-selection-store'
 import { useGraphStore } from '@/stores/graph-store'
 import { useGraphUiStore } from '@/stores/graph-ui-store'
 import { useSchemaStore } from '@/stores/schema-store'
@@ -700,6 +701,13 @@ function getConnectedIds(nodeId: string, edges: Edge[]): Set<string> {
   return ids
 }
 
+function resolveGraphNodeId(tableId: string, nodes: Node[]): string | null {
+  if (nodes.some((n) => n.id === tableId)) return tableId
+  const dictId = `dict_${tableId}`
+  if (nodes.some((n) => n.id === dictId)) return dictId
+  return null
+}
+
 export function GraphPage() {
   return (
     <ReactFlowProvider>
@@ -763,10 +771,15 @@ function GraphPageInner() {
   const connectionMode = useConnectionStore((s) => s.mode)
   const graph = useGraphStore((s) => s.graph)
   const theme = useThemeStore((s) => s.theme)
-  const { fitView, setViewport } = useReactFlow()
+  const { fitView, setViewport, setCenter } = useReactFlow()
 
-  const [selectedId, setSelectedId] = useState<string | null>(null)
   const selectedDatabase = useDatabaseFilterStore((s) => s.selectedDatabase)
+  const setSelectedDatabase = useDatabaseFilterStore((s) => s.setSelectedDatabase)
+  const selectedId = useGraphSelectionStore((s) => s.selectedId)
+  const focusRequestId = useGraphSelectionStore((s) => s.focusRequestId)
+  const selectNode = useGraphSelectionStore((s) => s.selectNode)
+  const selectAndFocus = useGraphSelectionStore((s) => s.selectAndFocus)
+  const clearSelection = useGraphSelectionStore((s) => s.clearSelection)
   const [unlinkedCollapsed, setUnlinkedCollapsed] = useState(loadUnlinkedCollapsed)
   const showMinimap = useGraphUiStore((s) => s.showMinimap)
   const showLegend = useGraphUiStore((s) => s.showLegend)
@@ -891,14 +904,56 @@ function GraphPageInner() {
     return [...layout.connected, ...layout.isolated]
   }, [computed])
 
+  // Highlight connected nodes/edges on selection
+  const { highlightedIds, selectedNodeId } = useMemo(() => {
+    if (!selectedId) return { highlightedIds: null, selectedNodeId: null }
+    const matchId = resolveGraphNodeId(selectedId, allComputedNodes)
+    if (!matchId) return { highlightedIds: null, selectedNodeId: null }
+    return { highlightedIds: getConnectedIds(matchId, computed.edges), selectedNodeId: matchId }
+  }, [selectedId, allComputedNodes, computed.edges])
+
+  const decoratedNodes = useMemo(
+    () =>
+      allNodes.map((n) => {
+        if (n.type === 'unlinked-header' || n.type === 'database-group') return n
+
+        if (!highlightedIds) {
+          return { ...n, className: '', data: { ...n.data, selected: false } }
+        }
+
+        return {
+          ...n,
+          className: highlightedIds.has(n.id) ? '' : 'opacity-20',
+          data: { ...n.data, selected: n.id === selectedNodeId },
+        }
+      }),
+    [allNodes, highlightedIds, selectedNodeId],
+  )
+
+  const decoratedEdges = useMemo(
+    () =>
+      computed.edges.map((e) => {
+        if (!highlightedIds) return { ...e, className: '', style: { ...e.style } }
+        const connected = highlightedIds.has(e.source) && highlightedIds.has(e.target)
+        return {
+          ...e,
+          className: connected ? '' : 'opacity-10',
+        }
+      }),
+    [computed.edges, highlightedIds],
+  )
+
   const [nodes, setNodes, onNodesChange] = useNodesState([] as Node[])
   const [edges, setEdges, onEdgesChange] = useEdgesState([] as Edge[])
+  const lastHandledFocusRequest = useRef(0)
 
-  // Apply layout and restore viewport (or fitView) after nodes are placed
   useEffect(() => {
-    setNodes(allNodes)
-    setEdges(computed.edges)
+    setNodes(decoratedNodes)
+    setEdges(decoratedEdges)
+  }, [decoratedNodes, decoratedEdges, setNodes, setEdges])
 
+  // Restore viewport (or fitView) after nodes are placed.
+  useEffect(() => {
     if (allNodes.length === 0) return
 
     // Wait for React Flow to measure nodes before adjusting viewport
@@ -912,63 +967,66 @@ function GraphPageInner() {
     })
   }, [allNodes, computed.edges, setNodes, setEdges, fitView, setViewport])
 
-  // Highlight connected nodes/edges on selection
-  const { highlightedIds, selectedNodeId } = useMemo(() => {
-    if (!selectedId) return { highlightedIds: null, selectedNodeId: null }
-    let matchId: string | null = null
-    if (allComputedNodes.some((n) => n.id === selectedId)) {
-      matchId = selectedId
-    } else if (allComputedNodes.some((n) => n.id === `dict_${selectedId}`)) {
-      matchId = `dict_${selectedId}`
-    }
-    if (!matchId) return { highlightedIds: null, selectedNodeId: null }
-    return { highlightedIds: getConnectedIds(matchId, computed.edges), selectedNodeId: matchId }
-  }, [selectedId, allComputedNodes, computed.edges])
-
   useEffect(() => {
-    if (!highlightedIds) {
-      setNodes((nds) =>
-        nds.map((n) =>
-          n.type === 'unlinked-header' || n.type === 'database-group'
-            ? n
-            : { ...n, className: '', data: { ...n.data, selected: false } },
-        ),
-      )
-      setEdges((eds) => eds.map((e) => ({ ...e, className: '', style: { ...e.style } })))
+    if (!selectedId || focusRequestId === 0 || focusRequestId === lastHandledFocusRequest.current) {
       return
     }
 
-    setNodes((nds) =>
-      nds.map((n) =>
-        n.type === 'unlinked-header' || n.type === 'database-group'
-          ? n
-          : {
-              ...n,
-              className: highlightedIds.has(n.id) ? '' : 'opacity-20',
-              data: { ...n.data, selected: n.id === selectedNodeId },
-            },
-      ),
-    )
-    setEdges((eds) =>
-      eds.map((e) => {
-        const connected = highlightedIds.has(e.source) && highlightedIds.has(e.target)
-        return {
-          ...e,
-          className: connected ? '' : 'opacity-10',
-        }
-      }),
-    )
-  }, [highlightedIds, selectedNodeId, setNodes, setEdges])
+    const nodeId = resolveGraphNodeId(selectedId, allComputedNodes)
+    if (!nodeId) {
+      if (selectedDatabase) {
+        setSelectedDatabase('')
+      }
+      return
+    }
 
-  const onNodeClick: NodeMouseHandler = useCallback((_event, node) => {
-    if (node.type === 'unlinked-header' || node.type === 'database-group') return
-    const tableId = node.id.startsWith('dict_') ? node.id.slice(5) : node.id
-    setSelectedId(tableId)
-  }, [])
+    const renderedNode = allNodes.find((n) => n.id === nodeId)
+    if (!renderedNode) {
+      if (!multiDb && unlinkedCollapsed) {
+        requestAnimationFrame(() => {
+          setUnlinkedCollapsed(false)
+          saveUnlinkedCollapsed(false)
+        })
+      }
+      return
+    }
+
+    const height = (renderedNode.data as { height?: number }).height ?? NODE_HEIGHT
+    lastHandledFocusRequest.current = focusRequestId
+    requestAnimationFrame(() => {
+      void setCenter(
+        renderedNode.position.x + NODE_WIDTH / 2,
+        renderedNode.position.y + height / 2,
+        {
+          zoom: 1,
+          duration: 450,
+        },
+      )
+    })
+  }, [
+    allComputedNodes,
+    allNodes,
+    focusRequestId,
+    multiDb,
+    selectedDatabase,
+    selectedId,
+    setCenter,
+    setSelectedDatabase,
+    unlinkedCollapsed,
+  ])
+
+  const onNodeClick: NodeMouseHandler = useCallback(
+    (_event, node) => {
+      if (node.type === 'unlinked-header' || node.type === 'database-group') return
+      const tableId = node.id.startsWith('dict_') ? node.id.slice(5) : node.id
+      selectNode(tableId)
+    },
+    [selectNode],
+  )
 
   const onPaneClick = useCallback(() => {
-    setSelectedId(null)
-  }, [])
+    clearSelection()
+  }, [clearSelection])
 
   const handleRefresh = useCallback(() => {
     if (schemaStatus === 'loading') return
@@ -1008,26 +1066,24 @@ function GraphPageInner() {
   // Navigate to a dependency node in the graph
   const handleNavigate = useCallback(
     (tableId: string) => {
-      const nodeExists = allComputedNodes.some(
-        (n) => n.id === tableId || n.id === `dict_${tableId}`,
-      )
+      const nodeExists = resolveGraphNodeId(tableId, allComputedNodes) !== null
       if (nodeExists) {
-        setSelectedId(tableId)
+        selectAndFocus(tableId)
       }
     },
-    [allComputedNodes],
+    [allComputedNodes, selectAndFocus],
   )
 
   // Keyboard: Esc closes detail panel
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setSelectedId(null)
+      if (e.key === 'Escape') clearSelection()
     }
     window.addEventListener('keydown', handleKey)
     return () => {
       window.removeEventListener('keydown', handleKey)
     }
-  }, [])
+  }, [clearSelection])
 
   if (!tablesReady) {
     return (
@@ -1050,7 +1106,7 @@ function GraphPageInner() {
               databases={databases}
               className="w-40 h-8 text-xs bg-card"
               onChange={() => {
-                setSelectedId(null)
+                clearSelection()
               }}
             />
           </div>
@@ -1233,7 +1289,7 @@ function GraphPageInner() {
               indices={allIndices}
               graph={graph}
               onClose={() => {
-                setSelectedId(null)
+                clearSelection()
               }}
               onNavigate={handleNavigate}
             />
@@ -1242,7 +1298,7 @@ function GraphPageInner() {
             <DictDetailPanel
               dict={selectedDict}
               onClose={() => {
-                setSelectedId(null)
+                clearSelection()
               }}
               onNavigate={handleNavigate}
             />
