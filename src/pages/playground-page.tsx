@@ -3,12 +3,13 @@ import {
   Clock,
   Eraser,
   Play,
+  Rocket,
   ShieldCheck,
   ShieldOff,
   TableProperties,
   TriangleAlert,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { ExplainView } from '@/components/playground/explain-view'
 import { QueryHistory } from '@/components/playground/query-history'
@@ -20,9 +21,11 @@ import { executeQuery, type QueryResult } from '@/lib/playground/execute'
 import { explainQuery, type ExplainMode, type ExplainResult } from '@/lib/playground/explain'
 import { addToHistory } from '@/lib/playground/history'
 import { validateQuerySafety } from '@/lib/playground/safety'
+import { buildStarterQueries, type StarterQuery } from '@/lib/playground/templates'
 import { cn } from '@/lib/utils'
 import { useConnectionStore } from '@/stores/connection-store'
 import { usePlaygroundStore } from '@/stores/playground-store'
+import { useSchemaStore } from '@/stores/schema-store'
 
 // ── Constants ──────────────────────────────────────────────────
 
@@ -92,6 +95,7 @@ function makeQueryErrorResult(error: string): QueryResult {
 
 interface ExecuteIntent {
   confirmedMutating?: boolean
+  sql?: string
 }
 
 interface PendingMutatingQuery {
@@ -112,9 +116,13 @@ export function PlaygroundPage() {
   const readOnlyMode = usePlaygroundStore((s) => s.readOnlyMode)
   const toggleReadOnlyMode = usePlaygroundStore((s) => s.toggleReadOnlyMode)
   const getParams = useConnectionStore((s) => s.getParams)
+  const currentDatabase = useConnectionStore((s) => s.database)
   const connectionMode = useConnectionStore((s) => s.mode)
   const disconnect = useConnectionStore((s) => s.disconnect)
+  const tables = useSchemaStore((s) => s.tables)
+  const columns = useSchemaStore((s) => s.columns)
   const navigate = useNavigate()
+  const isDemoMode = connectionMode === 'demo'
 
   const [queryState, setQueryState] = useState<QueryState>({ status: 'idle' })
   const [result, setResult] = useState<QueryResult | null>(null)
@@ -128,6 +136,11 @@ export function PlaygroundPage() {
   const abortRef = useRef<AbortController | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<SqlEditorHandle>(null)
+
+  const starterQueries = useMemo(
+    () => buildStarterQueries(tables, columns, currentDatabase),
+    [tables, columns, currentDatabase],
+  )
 
   // ── Get active statement ─────────────────────────────────────
 
@@ -152,7 +165,7 @@ export function PlaygroundPage() {
 
   const handleExecute = useCallback(
     (intent?: ExecuteIntent) => {
-      const stmt = getActiveStatement()
+      const stmt = (intent?.sql ?? getActiveStatement()).trim()
       if (!stmt) return
 
       const safety = validateQuerySafety(stmt, {
@@ -232,6 +245,16 @@ export function PlaygroundPage() {
       )
     },
     [connectionMode, getActiveStatement, getParams, readOnlyMode],
+  )
+
+  const handleStarterQueryRun = useCallback(
+    (query: StarterQuery) => {
+      setSql(query.sql)
+      if (!isDemoMode) {
+        handleExecute({ sql: query.sql })
+      }
+    },
+    [handleExecute, isDemoMode, setSql],
   )
 
   // ── Explain ────────────────────────────────────────────────
@@ -412,7 +435,6 @@ export function PlaygroundPage() {
   const hasResults = result !== null || explainResult !== null
   const isRunning = queryState.status === 'running'
   const sessionExpired = result?.sessionExpired === true || explainResult?.sessionExpired === true
-  const isDemoMode = connectionMode === 'demo'
 
   return (
     <div ref={containerRef} className="flex h-full flex-col overflow-hidden -m-6">
@@ -640,9 +662,13 @@ export function PlaygroundPage() {
 
             {/* Empty state */}
             {!isRunning && !result && !explainResult && queryState.status !== 'error' && (
-              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                Write a query and press {modKey}+Enter
-              </div>
+              <StarterQueriesEmptyState
+                queries={starterQueries}
+                modKey={modKey}
+                disabled={isRunning}
+                demoMode={isDemoMode}
+                onRun={handleStarterQueryRun}
+              />
             )}
           </div>
         </div>
@@ -655,6 +681,71 @@ export function PlaygroundPage() {
           }}
           onSelect={handleHistorySelect}
         />
+      </div>
+    </div>
+  )
+}
+
+interface StarterQueriesEmptyStateProps {
+  queries: StarterQuery[]
+  modKey: string
+  disabled: boolean
+  demoMode: boolean
+  onRun: (query: StarterQuery) => void
+}
+
+function StarterQueriesEmptyState({
+  queries,
+  modKey,
+  disabled,
+  demoMode,
+  onRun,
+}: StarterQueriesEmptyStateProps) {
+  return (
+    <div className="flex h-full items-center justify-center p-6">
+      <div className="w-full max-w-3xl">
+        <div className="mb-4 flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md border border-primary/30 bg-primary/10 text-primary">
+            <Rocket className="h-4 w-4" />
+          </div>
+          <div>
+            <h2 className="text-sm font-medium text-foreground">Start with your schema</h2>
+            <p className="text-xs text-muted-foreground">
+              Run a starter query or press {modKey}+Enter with your own SQL.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-2 md:grid-cols-2">
+          {queries.map((query) => (
+            <button
+              key={query.id}
+              type="button"
+              disabled={disabled}
+              onClick={() => {
+                onRun(query)
+              }}
+              className="group rounded-lg border border-border bg-card/70 p-3 text-left transition-colors hover:border-primary/40 hover:bg-secondary/60 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="text-sm font-medium text-foreground">{query.title}</span>
+                <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                  {query.badge}
+                </span>
+              </div>
+              <p className="mb-3 text-xs text-muted-foreground">{query.description}</p>
+              <div className="flex items-center justify-between gap-3">
+                <code className="min-w-0 truncate text-[10px] text-muted-foreground/70">
+                  {query.sql.split('\n')[0]}
+                </code>
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground transition-colors group-hover:bg-primary/90">
+                  <Play className="h-3 w-3" />
+                  {demoMode ? 'Load' : 'Run'}
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )
