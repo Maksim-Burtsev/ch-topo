@@ -512,7 +512,7 @@ export function PlaygroundPage() {
       />
 
       {/* Toolbar */}
-      <div className="flex items-center gap-1.5 border-b border-border bg-card px-3 py-1.5 select-none">
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-border bg-card px-3 py-1.5 select-none">
         {/* Execute */}
         <button
           type="button"
@@ -649,8 +649,8 @@ export function PlaygroundPage() {
         </button>
 
         {/* Shortcut hints */}
-        <div className="ml-auto flex items-center gap-3">
-          <span className="text-[10px] text-muted-foreground/50">
+        <div className="ml-auto flex min-w-0 items-center gap-3">
+          <span className="hidden text-[10px] text-muted-foreground/50 xl:inline">
             {modKey}+Enter run · {modKey}+Shift+Enter explain
           </span>
           {format === 'table' ? (
@@ -659,7 +659,7 @@ export function PlaygroundPage() {
               onClick={() => {
                 setFormat('json')
               }}
-              className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+              className="whitespace-nowrap text-[10px] text-muted-foreground/60 transition-colors hover:text-muted-foreground"
             >
               Switch to JSON
             </button>
@@ -669,7 +669,7 @@ export function PlaygroundPage() {
               onClick={() => {
                 setFormat('table')
               }}
-              className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+              className="whitespace-nowrap text-[10px] text-muted-foreground/60 transition-colors hover:text-muted-foreground"
             >
               Switch to Table
             </button>
@@ -678,7 +678,7 @@ export function PlaygroundPage() {
       </div>
 
       {/* Results area */}
-      <div style={{ flex: 1 }} className="flex min-h-0 overflow-hidden">
+      <div style={{ flex: 1 }} className="relative flex min-h-0 overflow-hidden">
         <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
           {/* Query stats bar */}
           <QueryStats state={queryState} />
@@ -787,6 +787,16 @@ export function PlaygroundPage() {
         </div>
 
         {/* History panel */}
+        {historyOpen && (
+          <button
+            type="button"
+            aria-label="Close query history"
+            className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm lg:hidden"
+            onClick={() => {
+              setHistoryOpen(false)
+            }}
+          />
+        )}
         <QueryHistory
           open={historyOpen}
           onClose={() => {
