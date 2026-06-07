@@ -1,4 +1,4 @@
-import { Loader2, X } from 'lucide-react'
+import { CheckCircle2, Loader2, X } from 'lucide-react'
 import type { QueryResult } from '@/lib/playground/execute'
 import { formatElapsed } from '@/lib/playground/query-stats-format'
 import { cn, formatBytes, formatNumber } from '@/lib/utils'
@@ -25,12 +25,12 @@ export function QueryStats({ state, className }: QueryStatsProps) {
     return (
       <div
         className={cn(
-          'flex items-center gap-2 border-b border-border px-3 py-1.5 text-xs text-muted-foreground',
+          'flex items-center gap-2 border-b border-border bg-card/80 px-3 py-2 text-xs text-muted-foreground',
           className,
         )}
       >
-        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        <span>Executing...</span>
+        <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+        <span className="font-medium text-foreground">Executing</span>
         <button
           type="button"
           onClick={state.onCancel}
@@ -49,7 +49,7 @@ export function QueryStats({ state, className }: QueryStatsProps) {
     return (
       <div
         className={cn(
-          'flex items-center gap-2 border-b border-destructive/30 bg-destructive/10 px-3 py-1.5 text-xs text-destructive',
+          'flex items-center gap-2 border-b border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive',
           className,
         )}
       >
@@ -64,14 +64,18 @@ export function QueryStats({ state, className }: QueryStatsProps) {
   return (
     <div
       className={cn(
-        'flex items-center gap-3 border-b border-border px-3 py-1.5 text-xs text-muted-foreground',
+        'flex flex-wrap items-center gap-2 border-b border-border bg-card/80 px-3 py-2 text-xs text-muted-foreground',
         className,
       )}
     >
+      <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+        Query complete
+      </span>
       <Stat label="Elapsed" value={formatElapsed(result.elapsed)} />
+      <Stat label="Returned" value={result.rows.length.toLocaleString()} />
       <Stat label="Rows read" value={formatNumber(result.rowsRead)} />
       <Stat label="Bytes read" value={formatBytes(result.bytesRead)} />
-      <Stat label="Returned" value={result.rows.length.toLocaleString()} />
     </div>
   )
 }
@@ -80,7 +84,7 @@ export function QueryStats({ state, className }: QueryStatsProps) {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <span className="inline-flex items-center gap-1">
+    <span className="inline-flex items-center gap-1 rounded-md bg-secondary/70 px-2 py-0.5">
       <span className="text-muted-foreground/60">{label}</span>
       <span className="text-foreground">{value}</span>
     </span>

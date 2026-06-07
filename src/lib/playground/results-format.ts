@@ -48,6 +48,27 @@ export function sortRows(
   return [...rows].sort((a, b) => multiplier * compareValues(a[column], b[column]))
 }
 
+// ── CSV export ────────────────────────────────────────────────
+
+function csvCellValue(value: unknown): string {
+  if (value === null || value === undefined) return ''
+  if (typeof value === 'number' || typeof value === 'boolean') return `${value}`
+  if (typeof value === 'string') return value
+  return JSON.stringify(value)
+}
+
+function escapeCsvCell(value: unknown): string {
+  const text = csvCellValue(value)
+  if (!/[",\n\r]/u.test(text)) return text
+  return `"${text.replaceAll('"', '""')}"`
+}
+
+export function rowsToCsv(rows: Record<string, unknown>[], columnNames: string[]): string {
+  const header = columnNames.map(escapeCsvCell).join(',')
+  const body = rows.map((row) => columnNames.map((column) => escapeCsvCell(row[column])).join(','))
+  return [header, ...body].join('\n')
+}
+
 // ── Clipboard ─────────────────────────────────────────────────
 
 export function copyToClipboard(value: unknown): Promise<void> {
