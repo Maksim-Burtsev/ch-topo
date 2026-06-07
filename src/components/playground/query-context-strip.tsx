@@ -63,7 +63,7 @@ export function QueryContextStrip({ sql, currentDatabase, tables }: QueryContext
   if (refs.length === 0) return null
 
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-border bg-card/70 px-3 py-2 text-xs">
+    <div className="flex min-w-0 flex-wrap items-center gap-2 border-b border-border bg-card/70 px-3 py-2 text-xs">
       <div className="flex items-center gap-1.5 text-muted-foreground">
         <Table2 className="h-3.5 w-3.5" />
         <span>Query touches</span>
@@ -74,9 +74,11 @@ export function QueryContextStrip({ sql, currentDatabase, tables }: QueryContext
         return (
           <div
             key={ref.key}
-            className="flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1"
+            className="flex min-w-0 max-w-full items-center gap-2 rounded-md border border-border bg-background px-2 py-1"
           >
-            <span className="font-mono text-[11px] text-foreground">{ref.displayName}</span>
+            <span className="min-w-0 max-w-48 truncate font-mono text-[11px] text-foreground">
+              {ref.displayName}
+            </span>
             {tableInfo ? (
               <>
                 <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">

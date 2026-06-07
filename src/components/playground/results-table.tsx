@@ -128,7 +128,7 @@ export function ResultsTable({ result, className }: ResultsTableProps) {
   }
 
   return (
-    <div className={cn('flex min-h-full', className)}>
+    <div className={cn('flex min-h-full flex-col xl:flex-row', className)}>
       <div className="min-w-0 flex-1">
         <div className="sticky top-0 z-30 flex flex-wrap items-center gap-2 border-b border-border bg-card/95 px-3 py-2 text-xs backdrop-blur">
           <div className="flex min-w-0 flex-wrap items-center gap-2 text-muted-foreground">
@@ -329,7 +329,7 @@ interface RowDetailPanelProps {
 
 function RowDetailPanel({ row, rowIndex, columns, copied, onCopy, onClose }: RowDetailPanelProps) {
   return (
-    <aside className="sticky top-0 h-fit max-h-[calc(100vh-11rem)] w-80 shrink-0 overflow-hidden border-l border-border bg-card">
+    <aside className="max-h-96 w-full shrink-0 overflow-hidden border-t border-border bg-card xl:sticky xl:top-0 xl:h-fit xl:max-h-[calc(100vh-11rem)] xl:w-80 xl:border-l xl:border-t-0">
       <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
         <div className="min-w-0">
           <h3 className="text-sm font-medium">Row {rowIndex + 1}</h3>
