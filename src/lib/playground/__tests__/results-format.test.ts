@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SortState } from '../results-format'
-import { compareValues, formatCellValue, isNullish, sortRows } from '../results-format'
+import { compareValues, formatCellValue, isNullish, rowsToCsv, sortRows } from '../results-format'
 
 // ── formatCellValue ─────────────────────────────────────────
 
@@ -171,5 +171,36 @@ describe('sortRows', () => {
     const sort: SortState = { column: 'value', direction: 'asc' }
     const sorted = sortRows(rowsWithNull, sort)
     expect(sorted.map((r) => r.value)).toEqual([5, 10, null])
+  })
+})
+
+// ── rowsToCsv ────────────────────────────────────────────────
+
+describe('rowsToCsv', () => {
+  it('exports headers and values in requested column order', () => {
+    const csv = rowsToCsv(
+      [
+        { id: 1, name: 'Alice' },
+        { id: 2, name: 'Bob' },
+      ],
+      ['id', 'name'],
+    )
+
+    expect(csv).toBe('id,name\n1,Alice\n2,Bob')
+  })
+
+  it('quotes commas, quotes, and newlines', () => {
+    const csv = rowsToCsv(
+      [{ name: 'ACME, Inc.', note: 'said "hello"\nthen left' }],
+      ['name', 'note'],
+    )
+
+    expect(csv).toBe('name,note\n"ACME, Inc.","said ""hello""\nthen left"')
+  })
+
+  it('exports nullish cells as empty strings and objects as JSON', () => {
+    const csv = rowsToCsv([{ missing: null, payload: { ok: true } }], ['missing', 'payload'])
+
+    expect(csv).toBe('missing,payload\n,"{""ok"":true}"')
   })
 })
