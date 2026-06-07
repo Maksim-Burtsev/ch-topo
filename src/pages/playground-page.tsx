@@ -2,6 +2,7 @@ import {
   Braces,
   Clock,
   Eraser,
+  FileSearch,
   Play,
   Rocket,
   ShieldCheck,
@@ -32,6 +33,11 @@ import { useSchemaStore } from '@/stores/schema-store'
 const MAX_DISPLAY_ROWS = 1000
 const MIN_EDITOR_PCT = 15
 const MAX_EDITOR_PCT = 85
+const EXPLAIN_MODES: { value: ExplainMode; label: string }[] = [
+  { value: 'plan', label: 'Plan' },
+  { value: 'pipeline', label: 'Pipeline' },
+  { value: 'syntax', label: 'Syntax' },
+]
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -128,6 +134,7 @@ export function PlaygroundPage() {
   const [result, setResult] = useState<QueryResult | null>(null)
   const [cappedMessage, setCappedMessage] = useState<string | null>(null)
   const [explainResult, setExplainResult] = useState<ExplainResult | null>(null)
+  const [explainMode, setExplainMode] = useState<ExplainMode>('plan')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [pendingMutatingQuery, setPendingMutatingQuery] = useState<PendingMutatingQuery | null>(
     null,
@@ -305,9 +312,20 @@ export function PlaygroundPage() {
 
   const handleExplainModeChange = useCallback(
     (mode: ExplainMode) => {
+      setExplainMode(mode)
       handleExplain(mode)
     },
     [handleExplain],
+  )
+
+  const handleToolbarExplainModeChange = useCallback(
+    (mode: ExplainMode) => {
+      setExplainMode(mode)
+      if (explainResult) {
+        handleExplain(mode)
+      }
+    },
+    [explainResult, handleExplain],
   )
 
   const handleConfirmMutatingQuery = useCallback(() => {
@@ -368,10 +386,10 @@ export function PlaygroundPage() {
         return
       }
 
-      // Ctrl/Cmd+Shift+Enter → explain plan
+      // Ctrl/Cmd+Shift+Enter → explain selected mode
       if (mod && e.shiftKey && e.key === 'Enter') {
         e.preventDefault()
-        handleExplain('plan')
+        handleExplain(explainMode)
         return
       }
 
@@ -397,7 +415,7 @@ export function PlaygroundPage() {
     return () => {
       window.removeEventListener('keydown', handleKey)
     }
-  }, [handleExecute, handleExplain, handleClear])
+  }, [handleExecute, handleExplain, handleClear, explainMode])
 
   // ── Drag resize ────────────────────────────────────────────
 
@@ -465,6 +483,45 @@ export function PlaygroundPage() {
           <Play className="h-3 w-3" />
           Execute
         </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            handleExplain(explainMode)
+          }}
+          disabled={isRunning || !sql.trim() || isDemoMode}
+          title={
+            isDemoMode
+              ? 'Demo Mode cannot explain queries'
+              : `Explain ${explainMode} (${modKey}+Shift+Enter)`
+          }
+          className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:opacity-50"
+        >
+          <FileSearch className="h-3 w-3" />
+          Explain
+        </button>
+
+        <div className="flex items-center gap-0.5 rounded-md bg-secondary/50 p-0.5">
+          {EXPLAIN_MODES.map((mode) => (
+            <button
+              key={mode.value}
+              type="button"
+              onClick={() => {
+                handleToolbarExplainModeChange(mode.value)
+              }}
+              disabled={isRunning || isDemoMode}
+              title={`Explain ${mode.label}`}
+              className={cn(
+                'rounded px-2 py-0.5 text-[10px] transition-colors disabled:opacity-50',
+                explainMode === mode.value
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </div>
 
         <div className="mx-1 h-4 w-px bg-border" />
 
