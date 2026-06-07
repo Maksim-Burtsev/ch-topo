@@ -135,7 +135,10 @@ export function QueryHistory({
 
   return (
     <div
-      className={cn('flex h-full w-80 flex-col border-l border-border bg-background', className)}
+      className={cn(
+        'fixed inset-y-0 right-0 z-50 flex w-[min(22rem,calc(100vw-3.5rem))] flex-col border-l border-border bg-background shadow-xl lg:static lg:z-auto lg:h-full lg:w-80 lg:shadow-none',
+        className,
+      )}
     >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
