@@ -1,5 +1,5 @@
 const STORAGE_KEY = 'chtopo_query_history'
-const MAX_ENTRIES = 100
+const MAX_RECENT_ENTRIES = 100
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -10,6 +10,9 @@ export interface HistoryEntry {
   elapsed: number
   rowsReturned: number
   error: boolean
+  saved?: boolean
+  title?: string
+  savedAt?: number
 }
 
 // ── Storage helpers ──────────────────────────────────────────
@@ -30,19 +33,37 @@ function saveEntries(entries: HistoryEntry[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(entries))
 }
 
+function makeId(timestamp: number): string {
+  return `${timestamp}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function limitEntries(entries: HistoryEntry[]): HistoryEntry[] {
+  const saved = entries.filter((entry) => entry.saved)
+  const recent = entries.filter((entry) => !entry.saved).slice(0, MAX_RECENT_ENTRIES)
+  return [...saved, ...recent]
+}
+
+function titleFromSql(sql: string): string {
+  const firstLine = truncateSql(sql.trim(), 48)
+  return firstLine || 'Untitled query'
+}
+
+function normalizeTitle(title?: string): string | undefined {
+  const trimmed = title?.trim()
+  if (trimmed === '') return undefined
+  return trimmed
+}
+
 // ── Public API ───────────────────────────────────────────────
 
 export function addToHistory(entry: Omit<HistoryEntry, 'id'>): HistoryEntry {
   const entries = loadEntries()
   const full: HistoryEntry = {
     ...entry,
-    id: `${entry.timestamp}-${Math.random().toString(36).slice(2, 8)}`,
+    id: makeId(entry.timestamp),
   }
   entries.unshift(full)
-  if (entries.length > MAX_ENTRIES) {
-    entries.length = MAX_ENTRIES
-  }
-  saveEntries(entries)
+  saveEntries(limitEntries(entries))
   return full
 }
 
@@ -50,8 +71,85 @@ export function getHistory(): HistoryEntry[] {
   return loadEntries()
 }
 
+export function getRecentQueries(): HistoryEntry[] {
+  return loadEntries().filter((entry) => !entry.saved)
+}
+
+export function getSavedQueries(): HistoryEntry[] {
+  return loadEntries()
+    .filter((entry) => entry.saved)
+    .sort((a, b) => (b.savedAt ?? b.timestamp) - (a.savedAt ?? a.timestamp))
+}
+
+export function saveQuery(sql: string, title?: string): HistoryEntry {
+  const now = Date.now()
+  const entries = loadEntries()
+  const existing = entries.find((entry) => entry.saved && entry.sql === sql)
+  if (existing) {
+    const updated: HistoryEntry = {
+      ...existing,
+      title: normalizeTitle(title) ?? existing.title ?? titleFromSql(sql),
+      savedAt: existing.savedAt ?? now,
+      saved: true,
+    }
+    saveEntries(entries.map((entry) => (entry.id === existing.id ? updated : entry)))
+    return updated
+  }
+
+  const recentMatch = entries.find((entry) => entry.sql === sql)
+  if (recentMatch) {
+    const updated: HistoryEntry = {
+      ...recentMatch,
+      title: normalizeTitle(title) ?? recentMatch.title ?? titleFromSql(sql),
+      saved: true,
+      savedAt: now,
+    }
+    saveEntries(
+      limitEntries(entries.map((entry) => (entry.id === recentMatch.id ? updated : entry))),
+    )
+    return updated
+  }
+
+  const saved: HistoryEntry = {
+    id: makeId(now),
+    sql,
+    timestamp: now,
+    elapsed: 0,
+    rowsReturned: 0,
+    error: false,
+    saved: true,
+    title: normalizeTitle(title) ?? titleFromSql(sql),
+    savedAt: now,
+  }
+
+  saveEntries(limitEntries([saved, ...entries]))
+  return saved
+}
+
+export function renameSavedQuery(id: string, title: string): HistoryEntry | null {
+  const entries = loadEntries()
+  const trimmed = title.trim()
+  let renamed: HistoryEntry | null = null
+  const next = entries.map((entry) => {
+    if (entry.id !== id || !entry.saved) return entry
+    renamed = { ...entry, title: trimmed || titleFromSql(entry.sql) }
+    return renamed
+  })
+  saveEntries(next)
+  return renamed
+}
+
+export function removeSavedQuery(id: string): void {
+  saveEntries(loadEntries().filter((entry) => entry.id !== id))
+}
+
 export function clearHistory(): void {
-  localStorage.removeItem(STORAGE_KEY)
+  const saved = loadEntries().filter((entry) => entry.saved)
+  if (saved.length === 0) {
+    localStorage.removeItem(STORAGE_KEY)
+    return
+  }
+  saveEntries(saved)
 }
 
 // ── Formatting helpers ───────────────────────────────────────
@@ -80,5 +178,7 @@ export function formatTimestamp(ts: number): string {
 export function filterHistory(entries: HistoryEntry[], query: string): HistoryEntry[] {
   if (!query.trim()) return entries
   const lower = query.toLowerCase()
-  return entries.filter((e) => e.sql.toLowerCase().includes(lower))
+  return entries.filter(
+    (e) => e.sql.toLowerCase().includes(lower) || (e.title ?? '').toLowerCase().includes(lower),
+  )
 }

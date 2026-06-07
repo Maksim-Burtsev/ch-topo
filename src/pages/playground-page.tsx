@@ -1,4 +1,5 @@
 import {
+  BookmarkPlus,
   Braces,
   Clock,
   Eraser,
@@ -21,7 +22,7 @@ import { ResultsTable } from '@/components/playground/results-table'
 import { SqlEditor, type SqlEditorHandle } from '@/components/playground/sql-editor'
 import { executeQuery, type QueryResult } from '@/lib/playground/execute'
 import { explainQuery, type ExplainMode, type ExplainResult } from '@/lib/playground/explain'
-import { addToHistory } from '@/lib/playground/history'
+import { addToHistory, saveQuery } from '@/lib/playground/history'
 import { validateQuerySafety } from '@/lib/playground/safety'
 import { buildStarterQueries, type StarterQuery } from '@/lib/playground/templates'
 import { cn } from '@/lib/utils'
@@ -138,6 +139,8 @@ export function PlaygroundPage() {
   const [explainMode, setExplainMode] = useState<ExplainMode>('plan')
   const [lastContextSql, setLastContextSql] = useState('')
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
+  const [savedFlash, setSavedFlash] = useState(false)
   const [pendingMutatingQuery, setPendingMutatingQuery] = useState<PendingMutatingQuery | null>(
     null,
   )
@@ -256,6 +259,7 @@ export function PlaygroundPage() {
             rowsReturned: totalRows,
             error: !!res.error,
           })
+          setHistoryRefreshKey((key) => key + 1)
         },
         () => {
           // should not happen — executeQuery catches all errors
@@ -388,6 +392,28 @@ export function PlaygroundPage() {
     },
     [setSql],
   )
+
+  const handleHistoryRun = useCallback(
+    (selectedSql: string) => {
+      setSql(selectedSql)
+      setLastContextSql(selectedSql)
+      handleExecute({ sql: selectedSql })
+    },
+    [handleExecute, setSql],
+  )
+
+  const handleSaveCurrentQuery = useCallback(() => {
+    const stmt = getActiveStatement().trim()
+    if (!stmt) return
+
+    saveQuery(stmt)
+    setLastContextSql(stmt)
+    setSavedFlash(true)
+    setHistoryRefreshKey((key) => key + 1)
+    setTimeout(() => {
+      setSavedFlash(false)
+    }, 1500)
+  }, [getActiveStatement])
 
   // ── Keyboard shortcuts ─────────────────────────────────────
 
@@ -599,6 +625,17 @@ export function PlaygroundPage() {
           History
         </button>
 
+        <button
+          type="button"
+          onClick={handleSaveCurrentQuery}
+          disabled={!sql.trim()}
+          title="Save current query"
+          className="inline-flex items-center gap-1 rounded-md bg-secondary px-2.5 py-1 text-xs text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:opacity-50"
+        >
+          <BookmarkPlus className="h-3 w-3" />
+          {savedFlash ? 'Saved' : 'Save'}
+        </button>
+
         {/* Clear */}
         <button
           type="button"
@@ -756,6 +793,8 @@ export function PlaygroundPage() {
             setHistoryOpen(false)
           }}
           onSelect={handleHistorySelect}
+          onRun={handleHistoryRun}
+          refreshKey={historyRefreshKey}
         />
       </div>
     </div>
