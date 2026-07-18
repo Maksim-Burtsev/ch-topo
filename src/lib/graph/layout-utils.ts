@@ -55,6 +55,14 @@ export function attachParentIds(
   })
 }
 
+export function preserveNodePositions(currentNodes: Node[], nextNodes: Node[]): Node[] {
+  const positions = new Map(currentNodes.map((node) => [node.id, node.position]))
+  return nextNodes.map((node) => {
+    const position = positions.get(node.id)
+    return position ? { ...node, position } : node
+  })
+}
+
 export function alignOneToOnePairs(nodes: Node[], edges: Edge[]): void {
   const outDeg: Record<string, number> = {}
   const inDeg: Record<string, number> = {}

@@ -24,7 +24,12 @@ import { SchemaDataNotice } from '@/components/shared/schema-data-notice'
 import type { RawTableRow } from '@/lib/clickhouse/types'
 import { getEffectiveDatabase } from '@/lib/database-utils'
 import { buildGraphSvg } from '@/lib/graph/export-svg'
-import { alignOneToOnePairs, attachParentIds, filterDictTables } from '@/lib/graph/layout-utils'
+import {
+  alignOneToOnePairs,
+  attachParentIds,
+  filterDictTables,
+  preserveNodePositions,
+} from '@/lib/graph/layout-utils'
 import type { DependencyGraph } from '@/lib/graph/types'
 import { formatBytes, formatNumber } from '@/lib/utils'
 import { useConnectionStore } from '@/stores/connection-store'
@@ -945,12 +950,17 @@ function GraphPageInner() {
 
   const [nodes, setNodes, onNodesChange] = useNodesState([] as Node[])
   const [edges, setEdges, onEdgesChange] = useEdgesState([] as Edge[])
+  const previousAllNodes = useRef<Node[] | null>(null)
   const lastHandledFocusRequest = useRef(0)
 
   useEffect(() => {
-    setNodes(decoratedNodes)
+    const layoutChanged = previousAllNodes.current !== allNodes
+    previousAllNodes.current = allNodes
+    setNodes((currentNodes) =>
+      layoutChanged ? decoratedNodes : preserveNodePositions(currentNodes, decoratedNodes),
+    )
     setEdges(decoratedEdges)
-  }, [decoratedNodes, decoratedEdges, setNodes, setEdges])
+  }, [allNodes, decoratedNodes, decoratedEdges, setNodes, setEdges])
 
   // Restore viewport (or fitView) after nodes are placed.
   useEffect(() => {
