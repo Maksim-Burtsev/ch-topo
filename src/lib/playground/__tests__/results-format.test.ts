@@ -203,4 +203,23 @@ describe('rowsToCsv', () => {
 
     expect(csv).toBe('missing,payload\n,"{""ok"":true}"')
   })
+
+  it('neutralizes spreadsheet formulas in string cells and headers', () => {
+    const csv = rowsToCsv(
+      [
+        {
+          '=formula': '=HYPERLINK("https://example.com")',
+          plus: '+cmd',
+          minus: '-cmd',
+          at: '@SUM(1,2)',
+          numeric: -42,
+        },
+      ],
+      ['=formula', 'plus', 'minus', 'at', 'numeric'],
+    )
+
+    expect(csv).toBe(
+      '\'=formula,plus,minus,at,numeric\n"\'=HYPERLINK(""https://example.com"")",\'+cmd,\'-cmd,"\'@SUM(1,2)",-42',
+    )
+  })
 })
