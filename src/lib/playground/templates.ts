@@ -31,7 +31,9 @@ function isDateType(type: string): boolean {
 }
 
 function isNumericType(type: string): boolean {
-  return /\b(U?Int\d*|Float\d*|Decimal|Bool)\b/i.test(type)
+  const directType = /^(?:Nullable|LowCardinality)\((.+)\)$/i.exec(type.trim())?.[1] ?? type.trim()
+
+  return /^(?:U?Int\d*|Float\d*|Decimal(?:32|64|128|256)?(?:\([^)]*\))?|Bool)$/i.test(directType)
 }
 
 function pickTable(tables: RawTableRow[], currentDatabase?: string): RawTableRow | undefined {

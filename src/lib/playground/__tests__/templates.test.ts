@@ -79,6 +79,19 @@ describe('buildStarterQueries', () => {
     expect(queries[3]?.sql).toContain('avg(`revenue`) AS avg_value')
   })
 
+  it.each(['Array(UInt64)', 'AggregateFunction(sum, UInt64)'])(
+    'does not profile nested numeric type %s',
+    (type) => {
+      const queries = buildStarterQueries(
+        [table({})],
+        [column({ name: 'nested_value', type })],
+        'analytics',
+      )
+
+      expect(queries.map((query) => query.id)).toEqual(['browse'])
+    },
+  )
+
   it('escapes backticks in generated identifiers', () => {
     const queries = buildStarterQueries(
       [table({ database: 'ana`lytics', name: 'eve`nts' })],
