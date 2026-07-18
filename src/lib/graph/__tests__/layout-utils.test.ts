@@ -1,6 +1,11 @@
 import type { Edge, Node } from '@xyflow/react'
 import { describe, expect, it } from 'vitest'
-import { alignOneToOnePairs, attachParentIds, filterDictTables } from '../layout-utils'
+import {
+  alignOneToOnePairs,
+  attachParentIds,
+  filterDictTables,
+  preserveNodePositions,
+} from '../layout-utils'
 
 // ─── filterDictTables ────────────────────────────────────────────────
 
@@ -232,5 +237,25 @@ describe('attachParentIds', () => {
 
     expect(result[0]?.parentId).toBe('__db_group_analytics__')
     expect(result[0]?.position).toEqual({ x: 50, y: 50 })
+  })
+})
+
+describe('preserveNodePositions', () => {
+  it('keeps dragged positions while applying selection decoration', () => {
+    const current = [makeNode('analytics.events', 480, 320, 70)]
+    const next = [
+      {
+        ...makeNode('analytics.events', 0, 0, 70),
+        className: 'opacity-20',
+        data: { height: 70, selected: true },
+      },
+    ]
+
+    expect(preserveNodePositions(current, next)).toEqual([
+      {
+        ...next[0],
+        position: { x: 480, y: 320 },
+      },
+    ])
   })
 })

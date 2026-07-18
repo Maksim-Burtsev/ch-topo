@@ -1,16 +1,20 @@
 import {
+  BookmarkPlus,
   Braces,
   Clock,
   Eraser,
+  FileSearch,
   Play,
+  Rocket,
   ShieldCheck,
   ShieldOff,
   TableProperties,
   TriangleAlert,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { ExplainView } from '@/components/playground/explain-view'
+import { QueryContextStrip } from '@/components/playground/query-context-strip'
 import { QueryHistory } from '@/components/playground/query-history'
 import { QueryStats, type QueryState } from '@/components/playground/query-stats'
 import { ResultsJson } from '@/components/playground/results-json'
@@ -18,17 +22,24 @@ import { ResultsTable } from '@/components/playground/results-table'
 import { SqlEditor, type SqlEditorHandle } from '@/components/playground/sql-editor'
 import { executeQuery, type QueryResult } from '@/lib/playground/execute'
 import { explainQuery, type ExplainMode, type ExplainResult } from '@/lib/playground/explain'
-import { addToHistory } from '@/lib/playground/history'
+import { addToHistory, saveQuery } from '@/lib/playground/history'
 import { validateQuerySafety } from '@/lib/playground/safety'
+import { buildStarterQueries, type StarterQuery } from '@/lib/playground/templates'
 import { cn } from '@/lib/utils'
 import { useConnectionStore } from '@/stores/connection-store'
 import { usePlaygroundStore } from '@/stores/playground-store'
+import { useSchemaStore } from '@/stores/schema-store'
 
 // ── Constants ──────────────────────────────────────────────────
 
 const MAX_DISPLAY_ROWS = 1000
 const MIN_EDITOR_PCT = 15
 const MAX_EDITOR_PCT = 85
+const EXPLAIN_MODES: { value: ExplainMode; label: string }[] = [
+  { value: 'plan', label: 'Plan' },
+  { value: 'pipeline', label: 'Pipeline' },
+  { value: 'syntax', label: 'Syntax' },
+]
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -92,6 +103,7 @@ function makeQueryErrorResult(error: string): QueryResult {
 
 interface ExecuteIntent {
   confirmedMutating?: boolean
+  sql?: string
 }
 
 interface PendingMutatingQuery {
@@ -112,15 +124,23 @@ export function PlaygroundPage() {
   const readOnlyMode = usePlaygroundStore((s) => s.readOnlyMode)
   const toggleReadOnlyMode = usePlaygroundStore((s) => s.toggleReadOnlyMode)
   const getParams = useConnectionStore((s) => s.getParams)
+  const currentDatabase = useConnectionStore((s) => s.database)
   const connectionMode = useConnectionStore((s) => s.mode)
   const disconnect = useConnectionStore((s) => s.disconnect)
+  const tables = useSchemaStore((s) => s.tables)
+  const columns = useSchemaStore((s) => s.columns)
   const navigate = useNavigate()
+  const isDemoMode = connectionMode === 'demo'
 
   const [queryState, setQueryState] = useState<QueryState>({ status: 'idle' })
   const [result, setResult] = useState<QueryResult | null>(null)
   const [cappedMessage, setCappedMessage] = useState<string | null>(null)
   const [explainResult, setExplainResult] = useState<ExplainResult | null>(null)
+  const [explainMode, setExplainMode] = useState<ExplainMode>('plan')
+  const [lastContextSql, setLastContextSql] = useState('')
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
+  const [savedFlash, setSavedFlash] = useState(false)
   const [pendingMutatingQuery, setPendingMutatingQuery] = useState<PendingMutatingQuery | null>(
     null,
   )
@@ -128,6 +148,19 @@ export function PlaygroundPage() {
   const abortRef = useRef<AbortController | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<SqlEditorHandle>(null)
+
+  const starterQueries = useMemo(
+    () => buildStarterQueries(tables, columns, currentDatabase),
+    [tables, columns, currentDatabase],
+  )
+
+  const editorContextSql = useMemo(() => {
+    const trimmed = sql.trim()
+    if (!trimmed) return ''
+
+    const idx = trimmed.indexOf(';')
+    return (idx >= 0 ? trimmed.slice(0, idx) : trimmed).trim()
+  }, [sql])
 
   // ── Get active statement ─────────────────────────────────────
 
@@ -152,8 +185,9 @@ export function PlaygroundPage() {
 
   const handleExecute = useCallback(
     (intent?: ExecuteIntent) => {
-      const stmt = getActiveStatement()
+      const stmt = (intent?.sql ?? getActiveStatement()).trim()
       if (!stmt) return
+      setLastContextSql(stmt)
 
       const safety = validateQuerySafety(stmt, {
         readOnlyMode,
@@ -225,6 +259,7 @@ export function PlaygroundPage() {
             rowsReturned: totalRows,
             error: !!res.error,
           })
+          setHistoryRefreshKey((key) => key + 1)
         },
         () => {
           // should not happen — executeQuery catches all errors
@@ -234,12 +269,24 @@ export function PlaygroundPage() {
     [connectionMode, getActiveStatement, getParams, readOnlyMode],
   )
 
+  const handleStarterQueryRun = useCallback(
+    (query: StarterQuery) => {
+      setSql(query.sql)
+      setLastContextSql(query.sql)
+      if (!isDemoMode) {
+        handleExecute({ sql: query.sql })
+      }
+    },
+    [handleExecute, isDemoMode, setSql],
+  )
+
   // ── Explain ────────────────────────────────────────────────
 
   const handleExplain = useCallback(
     (mode: ExplainMode) => {
       const stmt = getActiveStatement()
       if (!stmt) return
+      setLastContextSql(stmt)
 
       abortRef.current?.abort()
       const controller = new AbortController()
@@ -282,9 +329,20 @@ export function PlaygroundPage() {
 
   const handleExplainModeChange = useCallback(
     (mode: ExplainMode) => {
+      setExplainMode(mode)
       handleExplain(mode)
     },
     [handleExplain],
+  )
+
+  const handleToolbarExplainModeChange = useCallback(
+    (mode: ExplainMode) => {
+      setExplainMode(mode)
+      if (explainResult) {
+        handleExplain(mode)
+      }
+    },
+    [explainResult, handleExplain],
   )
 
   const handleConfirmMutatingQuery = useCallback(() => {
@@ -306,6 +364,7 @@ export function PlaygroundPage() {
     setResult(null)
     setCappedMessage(null)
     setExplainResult(null)
+    setLastContextSql('')
     setPendingMutatingQuery(null)
     setQueryState({ status: 'idle' })
   }, [])
@@ -315,6 +374,7 @@ export function PlaygroundPage() {
     setResult(null)
     setCappedMessage(null)
     setExplainResult(null)
+    setLastContextSql('')
     setPendingMutatingQuery(null)
     setQueryState({ status: 'idle' })
 
@@ -328,9 +388,32 @@ export function PlaygroundPage() {
   const handleHistorySelect = useCallback(
     (selectedSql: string) => {
       setSql(selectedSql)
+      setLastContextSql(selectedSql)
     },
     [setSql],
   )
+
+  const handleHistoryRun = useCallback(
+    (selectedSql: string) => {
+      setSql(selectedSql)
+      setLastContextSql(selectedSql)
+      handleExecute({ sql: selectedSql })
+    },
+    [handleExecute, setSql],
+  )
+
+  const handleSaveCurrentQuery = useCallback(() => {
+    const stmt = getActiveStatement().trim()
+    if (!stmt) return
+
+    saveQuery(stmt)
+    setLastContextSql(stmt)
+    setSavedFlash(true)
+    setHistoryRefreshKey((key) => key + 1)
+    setTimeout(() => {
+      setSavedFlash(false)
+    }, 1500)
+  }, [getActiveStatement])
 
   // ── Keyboard shortcuts ─────────────────────────────────────
 
@@ -345,10 +428,10 @@ export function PlaygroundPage() {
         return
       }
 
-      // Ctrl/Cmd+Shift+Enter → explain plan
+      // Ctrl/Cmd+Shift+Enter → explain selected mode
       if (mod && e.shiftKey && e.key === 'Enter') {
         e.preventDefault()
-        handleExplain('plan')
+        handleExplain(explainMode)
         return
       }
 
@@ -374,7 +457,7 @@ export function PlaygroundPage() {
     return () => {
       window.removeEventListener('keydown', handleKey)
     }
-  }, [handleExecute, handleExplain, handleClear])
+  }, [handleExecute, handleExplain, handleClear, explainMode])
 
   // ── Drag resize ────────────────────────────────────────────
 
@@ -412,7 +495,7 @@ export function PlaygroundPage() {
   const hasResults = result !== null || explainResult !== null
   const isRunning = queryState.status === 'running'
   const sessionExpired = result?.sessionExpired === true || explainResult?.sessionExpired === true
-  const isDemoMode = connectionMode === 'demo'
+  const contextSql = lastContextSql || editorContextSql
 
   return (
     <div ref={containerRef} className="flex h-full flex-col overflow-hidden -m-6">
@@ -429,7 +512,7 @@ export function PlaygroundPage() {
       />
 
       {/* Toolbar */}
-      <div className="flex items-center gap-1.5 border-b border-border bg-card px-3 py-1.5 select-none">
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-border bg-card px-3 py-1.5 select-none">
         {/* Execute */}
         <button
           type="button"
@@ -443,6 +526,45 @@ export function PlaygroundPage() {
           <Play className="h-3 w-3" />
           Execute
         </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            handleExplain(explainMode)
+          }}
+          disabled={isRunning || !sql.trim() || isDemoMode}
+          title={
+            isDemoMode
+              ? 'Demo Mode cannot explain queries'
+              : `Explain ${explainMode} (${modKey}+Shift+Enter)`
+          }
+          className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:opacity-50"
+        >
+          <FileSearch className="h-3 w-3" />
+          Explain
+        </button>
+
+        <div className="flex items-center gap-0.5 rounded-md bg-secondary/50 p-0.5">
+          {EXPLAIN_MODES.map((mode) => (
+            <button
+              key={mode.value}
+              type="button"
+              onClick={() => {
+                handleToolbarExplainModeChange(mode.value)
+              }}
+              disabled={isRunning || isDemoMode}
+              title={`Explain ${mode.label}`}
+              className={cn(
+                'rounded px-2 py-0.5 text-[10px] transition-colors disabled:opacity-50',
+                explainMode === mode.value
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </div>
 
         <div className="mx-1 h-4 w-px bg-border" />
 
@@ -503,6 +625,17 @@ export function PlaygroundPage() {
           History
         </button>
 
+        <button
+          type="button"
+          onClick={handleSaveCurrentQuery}
+          disabled={!sql.trim()}
+          title="Save current query"
+          className="inline-flex items-center gap-1 rounded-md bg-secondary px-2.5 py-1 text-xs text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:opacity-50"
+        >
+          <BookmarkPlus className="h-3 w-3" />
+          {savedFlash ? 'Saved' : 'Save'}
+        </button>
+
         {/* Clear */}
         <button
           type="button"
@@ -516,8 +649,8 @@ export function PlaygroundPage() {
         </button>
 
         {/* Shortcut hints */}
-        <div className="ml-auto flex items-center gap-3">
-          <span className="text-[10px] text-muted-foreground/50">
+        <div className="ml-auto flex min-w-0 items-center gap-3">
+          <span className="hidden text-[10px] text-muted-foreground/50 xl:inline">
             {modKey}+Enter run · {modKey}+Shift+Enter explain
           </span>
           {format === 'table' ? (
@@ -526,7 +659,7 @@ export function PlaygroundPage() {
               onClick={() => {
                 setFormat('json')
               }}
-              className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+              className="whitespace-nowrap text-[10px] text-muted-foreground/60 transition-colors hover:text-muted-foreground"
             >
               Switch to JSON
             </button>
@@ -536,7 +669,7 @@ export function PlaygroundPage() {
               onClick={() => {
                 setFormat('table')
               }}
-              className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+              className="whitespace-nowrap text-[10px] text-muted-foreground/60 transition-colors hover:text-muted-foreground"
             >
               Switch to Table
             </button>
@@ -545,7 +678,7 @@ export function PlaygroundPage() {
       </div>
 
       {/* Results area */}
-      <div style={{ flex: 1 }} className="flex min-h-0 overflow-hidden">
+      <div style={{ flex: 1 }} className="relative flex min-h-0 overflow-hidden">
         <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
           {/* Query stats bar */}
           <QueryStats state={queryState} />
@@ -604,6 +737,8 @@ export function PlaygroundPage() {
             </div>
           )}
 
+          <QueryContextStrip sql={contextSql} currentDatabase={currentDatabase} tables={tables} />
+
           {/* Results content */}
           <div className="flex-1 overflow-auto">
             {/* Loading skeleton */}
@@ -640,21 +775,102 @@ export function PlaygroundPage() {
 
             {/* Empty state */}
             {!isRunning && !result && !explainResult && queryState.status !== 'error' && (
-              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                Write a query and press {modKey}+Enter
-              </div>
+              <StarterQueriesEmptyState
+                queries={starterQueries}
+                modKey={modKey}
+                disabled={isRunning}
+                demoMode={isDemoMode}
+                onRun={handleStarterQueryRun}
+              />
             )}
           </div>
         </div>
 
         {/* History panel */}
+        {historyOpen && (
+          <button
+            type="button"
+            aria-label="Close query history"
+            className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm lg:hidden"
+            onClick={() => {
+              setHistoryOpen(false)
+            }}
+          />
+        )}
         <QueryHistory
           open={historyOpen}
           onClose={() => {
             setHistoryOpen(false)
           }}
           onSelect={handleHistorySelect}
+          onRun={handleHistoryRun}
+          refreshKey={historyRefreshKey}
         />
+      </div>
+    </div>
+  )
+}
+
+interface StarterQueriesEmptyStateProps {
+  queries: StarterQuery[]
+  modKey: string
+  disabled: boolean
+  demoMode: boolean
+  onRun: (query: StarterQuery) => void
+}
+
+function StarterQueriesEmptyState({
+  queries,
+  modKey,
+  disabled,
+  demoMode,
+  onRun,
+}: StarterQueriesEmptyStateProps) {
+  return (
+    <div className="flex h-full items-center justify-center p-6">
+      <div className="w-full max-w-3xl">
+        <div className="mb-4 flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md border border-primary/30 bg-primary/10 text-primary">
+            <Rocket className="h-4 w-4" />
+          </div>
+          <div>
+            <h2 className="text-sm font-medium text-foreground">Start with your schema</h2>
+            <p className="text-xs text-muted-foreground">
+              Run a starter query or press {modKey}+Enter with your own SQL.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-2 md:grid-cols-2">
+          {queries.map((query) => (
+            <button
+              key={query.id}
+              type="button"
+              disabled={disabled}
+              onClick={() => {
+                onRun(query)
+              }}
+              className="group rounded-lg border border-border bg-card/70 p-3 text-left transition-colors hover:border-primary/40 hover:bg-secondary/60 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="text-sm font-medium text-foreground">{query.title}</span>
+                <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                  {query.badge}
+                </span>
+              </div>
+              <p className="mb-3 text-xs text-muted-foreground">{query.description}</p>
+              <div className="flex items-center justify-between gap-3">
+                <code className="min-w-0 truncate text-[10px] text-muted-foreground/70">
+                  {query.sql.split('\n')[0]}
+                </code>
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground transition-colors group-hover:bg-primary/90">
+                  <Play className="h-3 w-3" />
+                  {demoMode ? 'Load' : 'Run'}
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )

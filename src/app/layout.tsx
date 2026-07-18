@@ -126,9 +126,9 @@ export function Layout() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden min-w-[1024px]">
+    <div className="flex h-screen min-w-0 overflow-hidden">
       {/* Sidebar */}
-      <aside className="flex w-[52px] flex-col items-center border-r border-border bg-card py-3 gap-1">
+      <aside className="flex w-[52px] shrink-0 flex-col items-center gap-1 border-r border-border bg-card py-3">
         <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary font-bold text-xs">
           ct
         </div>
@@ -174,17 +174,17 @@ export function Layout() {
       </aside>
 
       {/* Main */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Topbar */}
-        <header className="flex h-12 items-center justify-between border-b border-border bg-card px-4">
-          <h1 className="text-sm font-medium">{title}</h1>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <header className="flex h-12 min-w-0 items-center justify-between gap-3 border-b border-border bg-card px-4">
+          <h1 className="min-w-0 truncate text-sm font-medium">{title}</h1>
+          <div className="flex min-w-0 shrink items-center gap-2 text-xs text-muted-foreground">
             {schemaStatus === 'loading' && (
               <div className="flex items-center gap-2">
                 <div className="h-1 w-24 rounded-full bg-muted overflow-hidden">
                   <div className="h-full w-1/2 rounded-full bg-primary animate-pulse" />
                 </div>
-                <span className="text-muted-foreground/60">Loading schema...</span>
+                <span className="hidden text-muted-foreground/60 sm:inline">Loading schema...</span>
               </div>
             )}
             {schemaWarnings.length > 0 && (
@@ -202,7 +202,7 @@ export function Layout() {
             <span className="rounded border border-border px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
               {modeLabel}
             </span>
-            {displayHost}
+            <span className="max-w-[36vw] truncate sm:max-w-64">{displayHost}</span>
           </div>
         </header>
 
